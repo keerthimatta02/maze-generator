@@ -40,7 +40,7 @@ An interactive web application demonstrating data structures through maze genera
 - **BFS**: Finds shortest path through the maze
 
 ## Author
-[Your Name] - B.Tech 1st Year CEEP Project
+CSM_B- B.Tech 1st Year CEEP Project
 
 ## License
 MIT
