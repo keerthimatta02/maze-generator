@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MazeDSA — C Data Structures Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080b12;--bg2:#0e1219;--bg3:#141921;--bg4:#1a2130;--bg5:#202840;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);--border3:rgba(255,255,255,0.2);
+  --text:#dde4f0;--muted:#5a6478;--muted2:#8090a8;
+  --green:#4ade80;--green2:#16a34a;--green-dim:rgba(74,222,128,0.12);
+  --blue:#60a5fa;--blue-dim:rgba(96,165,250,0.12);
+  --amber:#fbbf24;--amber-dim:rgba(251,191,36,0.12);
+  --pink:#f472b6;--pink-dim:rgba(244,114,182,0.12);
+  --red:#f87171;--cyan:#22d3ee;--purple:#a78bfa;
+  --wall:#1e2840;--cell:#0e1219;
+  --visited-gen:rgba(74,222,128,0.08);
+  --stack-cell:rgba(96,165,250,0.15);
+  --current-cell:rgba(74,222,128,0.55);
+  --bfs-cell:rgba(34,211,238,0.12);
+  --path-cell:rgba(251,191,36,0.35);
+  --start-cell:rgba(167,139,250,0.6);
+  --end-cell:rgba(248,113,113,0.6);
+}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Outfit',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* ── ANIMATED GRID BACKGROUND ── */
+body::before{
+  content:'';
+  position:fixed;
+  inset:0;
+  background-image:
+    linear-gradient(rgba(74,222,128,0.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(74,222,128,0.03) 1px,transparent 1px);
+  background-size:40px 40px;
+  pointer-events:none;
+  z-index:0;
+}
+
+/* ── HEADER ── */
+header{
+  position:relative;z-index:10;
+  padding:1.6rem 2rem 1.2rem;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;
+  border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg,rgba(8,11,18,0.98) 0%,rgba(8,11,18,0.85) 100%);
+  backdrop-filter:blur(12px);
+}
+.logo{display:flex;align-items:center;gap:14px}
+.logo-mark{
+  width:46px;height:46px;border-radius:12px;
+  background:linear-gradient(135deg,var(--green),var(--blue));
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;flex-shrink:0;
+  box-shadow:0 0 24px rgba(74,222,128,0.3);
+}
+.logo-text h1{
+  font-size:1.55rem;font-weight:800;letter-spacing:-0.04em;
+  background:linear-gradient(90deg,var(--green),var(--blue));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.logo-text p{font-size:0.72rem;color:var(--muted2);font-family:'JetBrains Mono',monospace;margin-top:1px}
+.header-badges{display:flex;gap:8px;flex-wrap:wrap}
+.badge{
+  padding:4px 10px;border-radius:6px;font-size:0.7rem;
+  font-family:'JetBrains Mono',monospace;font-weight:500;
+  border:1px solid transparent;letter-spacing:0.02em;
+}
+.badge.graph{background:var(--blue-dim);color:var(--blue);border-color:rgba(96,165,250,0.2)}
+.badge.tree{background:var(--green-dim);color:var(--green);border-color:rgba(74,222,128,0.2)}
+.badge.stack{background:var(--amber-dim);color:var(--amber);border-color:rgba(251,191,36,0.2)}
+.badge.queue{background:var(--pink-dim);color:var(--pink);border-color:rgba(244,114,182,0.2)}
+.badge.c{background:rgba(167,139,250,0.12);color:var(--purple);border-color:rgba(167,139,250,0.2)}
+
+/* ── APP LAYOUT ── */
+.app{
+  position:relative;z-index:1;
+  display:grid;
+  grid-template-columns:290px 1fr 260px;
+  grid-template-rows:auto;
+  gap:12px;
+  padding:12px 14px 14px;
+  min-height:calc(100vh - 85px);
+}
+
+/* ── PANELS ── */
+.panel{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:14px;
+  overflow:hidden;
+  display:flex;flex-direction:column;
+}
+.panel-header{
+  padding:9px 14px;
+  background:var(--bg3);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.panel-title{
+  font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;
+  color:var(--muted2);font-family:'JetBrains Mono',monospace;font-weight:500;
+}
+.panel-dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.panel-dot.green{background:var(--green);box-shadow:0 0 8px var(--green)}
+.panel-dot.amber{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.panel-body{padding:12px;flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+
+/* ── LEFT SIDEBAR ── */
+.left-sidebar{
+  display:flex;flex-direction:column;gap:10px;
+  grid-row:1;grid-column:1;
+}
+
+/* Size selector */
+.size-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+.size-btn{
+  padding:9px 4px;background:var(--bg3);
+  border:1px solid var(--border);border-radius:9px;
+  color:var(--muted2);font-family:'JetBrains Mono',monospace;font-size:0.72rem;
+  cursor:pointer;transition:all 0.15s;text-align:center;
+}
+.size-btn:hover{border-color:var(--green);color:var(--green)}
+.size-btn.active{
+  border-color:var(--green);color:var(--green);
+  background:var(--green-dim);
+  box-shadow:0 0 12px rgba(74,222,128,0.15);
+}
+.size-btn span{display:block;font-size:0.6rem;color:var(--muted);margin-top:2px}
+
+/* Sliders */
+.slider-row{display:flex;flex-direction:column;gap:5px}
+.slider-label{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:0.72rem;color:var(--muted2);font-family:'JetBrains Mono',monospace;
+}
+.slider-label strong{color:var(--text);font-weight:600}
+input[type=range]{
+  width:100%;height:4px;border-radius:2px;
+  appearance:none;-webkit-appearance:none;
+  background:var(--bg4);outline:none;cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--green);
+  box-shadow:0 0 8px rgba(74,222,128,0.5);cursor:pointer;
+}
+input[type=range]::-webkit-slider-runnable-track{
+  border-radius:2px;height:4px;
+}
+
+/* Speed control */
+.speed-row{display:flex;gap:5px}
+.speed-btn{
+  flex:1;padding:6px 2px;background:var(--bg3);
+  border:1px solid var(--border);border-radius:7px;
+  color:var(--muted2);font-size:0.68rem;font-family:'JetBrains Mono',monospace;
+  cursor:pointer;transition:all 0.12s;text-align:center;
+}
+.speed-btn.active{
+  border-color:var(--amber);color:var(--amber);background:var(--amber-dim);
+}
+
+/* Action buttons */
+.btn-generate{
+  width:100%;padding:12px;border-radius:10px;
+  background:linear-gradient(135deg,var(--green),#22c55e);
+  border:none;color:#000;font-family:'Outfit',sans-serif;
+  font-size:0.9rem;font-weight:700;cursor:pointer;
+  transition:all 0.15s;letter-spacing:0.01em;
+}
+.btn-generate:hover{opacity:0.88;transform:translateY(-1px);box-shadow:0 4px 20px rgba(74,222,128,0.3)}
+.btn-generate:active{transform:scale(0.98)}
+
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.btn{
+  padding:9px;border-radius:9px;background:var(--bg3);
+  border:1px solid var(--border);color:var(--text);
+  font-family:'Outfit',sans-serif;font-size:0.78rem;
+  cursor:pointer;transition:all 0.12s;text-align:center;font-weight:500;
+}
+.btn:hover{border-color:var(--border2);background:var(--bg4)}
+.btn:active{transform:scale(0.97)}
+.btn.solve{border-color:rgba(96,165,250,0.3);color:var(--blue)}
+.btn.solve:hover{background:var(--blue-dim)}
+.btn.step{border-color:rgba(251,191,36,0.3);color:var(--amber)}
+.btn.step:hover{background:var(--amber-dim)}
+.btn.danger{border-color:rgba(248,113,113,0.3);color:var(--red)}
+.btn.danger:hover{background:rgba(248,113,113,0.1)}
+.btn.pause{border-color:rgba(244,114,182,0.3);color:var(--pink)}
+.btn.pause:hover{background:var(--pink-dim)}
+.btn:disabled{opacity:0.35;cursor:not-allowed}
+
+/* Seed row */
+.seed-row{display:flex;gap:6px;align-items:center}
+.seed-input{
+  flex:1;padding:7px 10px;background:var(--bg3);
+  border:1px solid var(--border);border-radius:8px;
+  color:var(--text);font-family:'JetBrains Mono',monospace;font-size:0.78rem;
+  outline:none;
+}
+.seed-input:focus{border-color:var(--green)}
+.seed-dice{
+  padding:7px 10px;background:var(--bg3);
+  border:1px solid var(--border);border-radius:8px;
+  cursor:pointer;font-size:1rem;transition:all 0.12s;
+}
+.seed-dice:hover{border-color:var(--green);transform:rotate(20deg)}
+
+/* Legend */
+.legend{display:flex;flex-direction:column;gap:5px}
+.legend-item{display:flex;align-items:center;gap:8px;font-size:0.72rem;color:var(--muted2)}
+.legend-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+
+/* DS info cards */
+.ds-cards{display:flex;flex-direction:column;gap:6px}
+.ds-card{
+  padding:9px 11px;border-radius:9px;
+  border:1px solid transparent;cursor:pointer;transition:all 0.15s;
+}
+.ds-card.graph{background:var(--blue-dim);border-color:rgba(96,165,250,0.15)}
+.ds-card.tree{background:var(--green-dim);border-color:rgba(74,222,128,0.15)}
+.ds-card.stack{background:var(--amber-dim);border-color:rgba(251,191,36,0.15)}
+.ds-card.queue{background:var(--pink-dim);border-color:rgba(244,114,182,0.15)}
+.ds-card:hover{transform:translateX(2px)}
+.ds-card-head{display:flex;align-items:center;gap:7px;margin-bottom:3px}
+.ds-card-icon{font-size:0.8rem}
+.ds-card-title{font-size:0.72rem;font-weight:600;font-family:'JetBrains Mono',monospace}
+.ds-card.graph .ds-card-title{color:var(--blue)}
+.ds-card.tree .ds-card-title{color:var(--green)}
+.ds-card.stack .ds-card-title{color:var(--amber)}
+.ds-card.queue .ds-card-title{color:var(--pink)}
+.ds-card-desc{font-size:0.65rem;color:var(--muted2);line-height:1.4}
+
+/* ── CENTER: MAZE CANVAS ── */
+.maze-center{
+  grid-row:1;grid-column:2;
+  display:flex;flex-direction:column;gap:10px;
+}
+.maze-wrapper{
+  flex:1;display:flex;flex-direction:column;
+  background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;
+}
+.maze-topbar{
+  padding:8px 14px;background:var(--bg3);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.maze-status{
+  font-family:'JetBrains Mono',monospace;font-size:0.72rem;
+  display:flex;align-items:center;gap:6px;
+}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:background 0.3s}
+.status-dot.gen{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 1s infinite}
+.status-dot.solve{background:var(--blue);box-shadow:0 0 8px var(--blue);animation:pulse 1s infinite}
+.status-dot.done{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+.maze-info{display:flex;gap:14px}
+.maze-info-item{font-size:0.68rem;color:var(--muted2);font-family:'JetBrains Mono',monospace}
+.maze-info-item strong{color:var(--text)}
+
+#maze-canvas-wrap{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  padding:16px;min-height:380px;
+  position:relative;
+}
+canvas{
+  display:block;
+  border-radius:4px;
+  image-rendering:pixelated;
+}
+
+/* Progress bar */
+.progress-bar{
+  height:2px;background:var(--bg4);
+  position:relative;overflow:hidden;
+}
+.progress-fill{
+  height:100%;width:0%;
+  background:linear-gradient(90deg,var(--green),var(--blue));
+  transition:width 0.1s linear;
+}
+
+/* ── PHASE INDICATOR ── */
+.phase-tabs{
+  display:flex;gap:6px;padding:0 14px 8px;
+}
+.phase-tab{
+  flex:1;padding:7px 4px;border-radius:8px;
+  border:1px solid var(--border);background:var(--bg3);
+  font-size:0.65rem;font-family:'JetBrains Mono',monospace;
+  color:var(--muted);text-align:center;transition:all 0.15s;
+}
+.phase-tab.active.gen{border-color:rgba(74,222,128,0.4);background:var(--green-dim);color:var(--green)}
+.phase-tab.active.solve{border-color:rgba(96,165,250,0.4);background:var(--blue-dim);color:var(--blue)}
+.phase-tab.active.path{border-color:rgba(251,191,36,0.4);background:var(--amber-dim);color:var(--amber)}
+.phase-tab.done{border-color:var(--border2);color:var(--muted2)}
+.phase-tab-label{font-weight:600;display:block}
+.phase-tab-val{font-size:0.6rem;margin-top:1px;display:block}
+
+/* ── RIGHT SIDEBAR ── */
+.right-sidebar{
+  grid-row:1;grid-column:3;
+  display:flex;flex-direction:column;gap:10px;
+}
+
+/* Stats cards */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.stat-card{
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:10px;padding:10px;text-align:center;
+}
+.stat-label{font-size:0.6rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.05em}
+.stat-val{font-size:1.5rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--text);margin-top:2px;line-height:1}
+.stat-val.green{color:var(--green)}
+.stat-val.blue{color:var(--blue)}
+.stat-val.amber{color:var(--amber)}
+.stat-val.pink{color:var(--pink)}
+
+/* Complexity table */
+.complexity-table{width:100%;border-collapse:collapse;font-size:0.68rem;font-family:'JetBrains Mono',monospace}
+.complexity-table th{
+  padding:5px 8px;text-align:left;color:var(--muted);
+  border-bottom:1px solid var(--border);font-weight:500;font-size:0.62rem;
+}
+.complexity-table td{
+  padding:5px 8px;color:var(--text);border-bottom:1px solid rgba(255,255,255,0.03);
+}
+.complexity-table td:first-child{color:var(--muted2)}
+.complexity-table td:last-child{color:var(--green)}
+
+/* C Code viewer */
+.code-panel{
+  background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;
+  margin-top:0;
+}
+.code-tabs{
+  display:flex;border-bottom:1px solid var(--border);background:var(--bg3);
+}
+.code-tab{
+  padding:8px 12px;font-size:0.68rem;font-family:'JetBrains Mono',monospace;
+  color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;
+  transition:all 0.12s;white-space:nowrap;
+}
+.code-tab.active{color:var(--green);border-bottom-color:var(--green)}
+.code-tab:hover:not(.active){color:var(--muted2)}
+.code-view{
+  padding:12px;font-family:'JetBrains Mono',monospace;font-size:0.65rem;
+  line-height:1.7;color:#8899bb;max-height:220px;overflow-y:auto;
+  white-space:pre;tab-size:2;
+}
+.code-view .kw{color:#a78bfa}
+.code-view .type{color:#60a5fa}
+.code-view .fn{color:#4ade80}
+.code-view .cm{color:#4a5568;font-style:italic}
+.code-view .str{color:#fbbf24}
+.code-view .num{color:#f472b6}
+
+/* Performance chart */
+.perf-chart{
+  display:flex;flex-direction:column;gap:5px;
+}
+.perf-bar-row{display:flex;align-items:center;gap:8px;font-size:0.65rem}
+.perf-bar-label{width:60px;color:var(--muted2);font-family:'JetBrains Mono',monospace;flex-shrink:0}
+.perf-bar-track{flex:1;height:6px;background:var(--bg4);border-radius:3px;overflow:hidden}
+.perf-bar-fill{height:100%;border-radius:3px;transition:width 0.6s ease}
+.perf-bar-val{width:50px;color:var(--text);font-family:'JetBrains Mono',monospace;text-align:right}
+
+/* App info */
+.app-info{
+  padding:10px;font-size:0.65rem;color:var(--muted2);line-height:1.6;
+  font-family:'JetBrains Mono',monospace;
+}
+.app-use-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.app-use-item{
+  padding:7px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:8px;font-size:0.62rem;color:var(--muted2);text-align:center;
+}
+.app-use-icon{font-size:1.1rem;display:block;margin-bottom:2px}
+.app-use-label{color:var(--text);font-weight:500;display:block;font-size:0.64rem}
+
+/* Scrollbars */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:var(--bg5)}
+
+/* Toast */
+.toast{
+  position:fixed;bottom:20px;right:20px;z-index:1000;
+  padding:10px 16px;background:var(--bg3);border:1px solid var(--green);
+  border-radius:10px;font-size:0.78rem;font-family:'JetBrains Mono',monospace;
+  color:var(--green);opacity:0;transition:opacity 0.3s;
+  pointer-events:none;
+}
+.toast.show{opacity:1}
+
+/* Tooltip */
+.tooltip{
+  position:absolute;z-index:100;
+  padding:5px 9px;background:var(--bg3);border:1px solid var(--border2);
+  border-radius:7px;font-size:0.65rem;font-family:'JetBrains Mono',monospace;
+  color:var(--text);white-space:nowrap;pointer-events:none;
+  opacity:0;transition:opacity 0.15s;
+}
+.tooltip.show{opacity:1}
+
+@media(max-width:1100px){
+  .app{grid-template-columns:260px 1fr;grid-template-rows:auto auto}
+  .right-sidebar{grid-row:2;grid-column:1/3}
+  .right-sidebar .panel:nth-child(n+3){display:none}
+}
+@media(max-width:760px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto}
+  .left-sidebar,.maze-center,.right-sidebar{grid-column:1;grid-row:auto}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">🧩</div>
+    <div class="logo-text">
+      <h1>MazeDSA</h1>
+      <p>// C-powered data structure visualizer</p>
+    </div>
+  </div>
+  <div class="header-badges">
+    <span class="badge c">C lang</span>
+    <span class="badge graph">Graph</span>
+    <span class="badge tree">Spanning Tree</span>
+    <span class="badge stack">Stack</span>
+    <span class="badge queue">Queue</span>
+  </div>
+</header>
+
+<div class="app">
+  <!-- ── LEFT SIDEBAR ── -->
+  <div class="left-sidebar">
+
+    <!-- Size presets -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Maze Size</span>
+        <span class="panel-dot" id="dot-size"></span>
+      </div>
+      <div class="panel-body" style="gap:8px">
+        <div class="size-grid">
+          <button class="size-btn" data-rows="6"  data-cols="10" onclick="applyPreset(this)">Tiny<span>6×10</span></button>
+          <button class="size-btn active" data-rows="8" data-cols="14" onclick="applyPreset(this)">Small<span>8×14</span></button>
+          <button class="size-btn" data-rows="12" data-cols="20" onclick="applyPreset(this)">Med<span>12×20</span></button>
+          <button class="size-btn" data-rows="18" data-cols="28" onclick="applyPreset(this)">Large<span>18×28</span></button>
+          <button class="size-btn" data-rows="24" data-cols="36" onclick="applyPreset(this)">XL<span>24×36</span></button>
+          <button class="size-btn" data-rows="30" data-cols="44" onclick="applyPreset(this)">XXL<span>30×44</span></button>
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><span>Rows</span><strong id="val-rows">8</strong></div>
+          <input type="range" id="sl-rows" min="4" max="36" value="8" oninput="syncSlider('rows',this.value)">
+        </div>
+        <div class="slider-row">
+          <div class="slider-label"><span>Cols</span><strong id="val-cols">14</strong></div>
+          <input type="range" id="sl-cols" min="4" max="54" value="14" oninput="syncSlider('cols',this.value)">
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Controls</span>
+        <span class="panel-dot green" id="dot-ctrl"></span>
+      </div>
+      <div class="panel-body" style="gap:8px">
+        <!-- Seed -->
+        <div>
+          <div class="slider-label" style="margin-bottom:5px"><span>Seed</span></div>
+          <div class="seed-row">
+            <input class="seed-input" id="seed-inp" type="number" value="3003" min="1" max="99999">
+            <button class="seed-dice" onclick="randomSeed()" title="Random seed">🎲</button>
+          </div>
+        </div>
+
+        <!-- Speed -->
+        <div>
+          <div class="slider-label" style="margin-bottom:5px"><span>Speed</span></div>
+          <div class="speed-row">
+            <button class="speed-btn" onclick="setSpeed(0,this)">Slow</button>
+            <button class="speed-btn active" onclick="setSpeed(1,this)">Med</button>
+            <button class="speed-btn" onclick="setSpeed(2,this)">Fast</button>
+            <button class="speed-btn" onclick="setSpeed(3,this)">Turbo</button>
+          </div>
+        </div>
+
+        <button class="btn-generate" onclick="generateMaze()">⚡ Generate Maze</button>
+        <div class="btn-row">
+          <button class="btn solve" onclick="solveMaze()" id="btn-solve" disabled>🔍 Solve</button>
+          <button class="btn step" onclick="stepMode()" id="btn-step">👣 Step</button>
+          <button class="btn pause" onclick="togglePause()" id="btn-pause" disabled>⏸ Pause</button>
+          <button class="btn danger" onclick="resetAll()" id="btn-reset">↺ Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Color Legend</span></div>
+      <div class="panel-body" style="gap:6px;padding:10px">
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(167,139,250,0.8)"></div>Start cell</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(248,113,113,0.8)"></div>End cell</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(74,222,128,0.6)"></div>Current (DFS head)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(96,165,250,0.25)"></div>Stack (backtrack path)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(74,222,128,0.12)"></div>Visited (spanning tree)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(34,211,238,0.2)"></div>BFS frontier</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(251,191,36,0.5)"></div>Shortest path</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DS Info -->
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Data Structures (C)</span></div>
+      <div class="panel-body" style="padding:8px">
+        <div class="ds-cards">
+          <div class="ds-card graph" onclick="showCode('graph')">
+            <div class="ds-card-head"><span class="ds-card-icon">🔵</span><span class="ds-card-title">Graph — Adj List</span></div>
+            <div class="ds-card-desc">Cells = nodes, passages = edges. Built as adjacency list before DFS runs.</div>
+          </div>
+          <div class="ds-card tree" onclick="showCode('tree')">
+            <div class="ds-card-head"><span class="ds-card-icon">🌲</span><span class="ds-card-title">Spanning Tree</span></div>
+            <div class="ds-card-desc">Each REMOVE is a tree edge. DFS produces a perfect spanning tree — exactly one path between any 2 cells.</div>
+          </div>
+          <div class="ds-card stack" onclick="showCode('stack')">
+            <div class="ds-card-head"><span class="ds-card-icon">📚</span><span class="ds-card-title">Stack — DFS Backtrack</span></div>
+            <div class="ds-card-desc">Array-based LIFO. Push on move, pop when stuck. Blue cells = stack contents.</div>
+          </div>
+          <div class="ds-card queue" onclick="showCode('queue')">
+            <div class="ds-card-head"><span class="ds-card-icon">🔄</span><span class="ds-card-title">Queue — BFS Solver</span></div>
+            <div class="ds-card-desc">Array-based FIFO. Guarantees shortest path. Cyan cells = BFS frontier.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── CENTER: MAZE ── -->
+  <div class="maze-center">
+    <div class="maze-wrapper">
+      <div class="maze-topbar">
+        <div class="maze-status">
+          <div class="status-dot" id="status-dot"></div>
+          <span id="status-text" style="color:var(--muted2)">Ready — pick a size and generate</span>
+        </div>
+        <div class="maze-info">
+          <div class="maze-info-item">step <strong id="inf-step">—</strong></div>
+          <div class="maze-info-item">stack <strong id="inf-stack">—</strong></div>
+          <div class="maze-info-item">visited <strong id="inf-vis">—</strong></div>
+        </div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="prog"></div></div>
+      <div id="maze-canvas-wrap">
+        <div style="text-align:center;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:0.78rem">
+          <div style="font-size:2.5rem;margin-bottom:12px">🧩</div>
+          Click <strong style="color:var(--green)">Generate Maze</strong> to start<br>
+          <span style="font-size:0.65rem;margin-top:6px;display:block">Powered by C — DFS + BFS + Graph + Stack + Queue</span>
+        </div>
+      </div>
+      <div class="phase-tabs">
+        <div class="phase-tab" id="ptab-gen"><span class="phase-tab-label">DFS Generate</span><span class="phase-tab-val" id="pval-gen">—</span></div>
+        <div class="phase-tab" id="ptab-solve"><span class="phase-tab-label">BFS Solve</span><span class="phase-tab-val" id="pval-solve">—</span></div>
+        <div class="phase-tab" id="ptab-path"><span class="phase-tab-label">Shortest Path</span><span class="phase-tab-val" id="pval-path">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RIGHT SIDEBAR ── -->
+  <div class="right-sidebar">
+
+    <!-- Stats -->
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Performance Stats</span><span class="panel-dot amber" id="dot-stats"></span></div>
+      <div class="panel-body" style="padding:8px">
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-label">Nodes</div><div class="stat-val green" id="stat-nodes">—</div></div>
+          <div class="stat-card"><div class="stat-label">Graph Edges</div><div class="stat-val blue" id="stat-edges">—</div></div>
+          <div class="stat-card"><div class="stat-label">Tree Edges</div><div class="stat-val green" id="stat-tree">—</div></div>
+          <div class="stat-card"><div class="stat-label">Backtracks</div><div class="stat-val amber" id="stat-back">—</div></div>
+          <div class="stat-card"><div class="stat-label">BFS Steps</div><div class="stat-val" id="stat-bfs" style="color:var(--cyan)">—</div></div>
+          <div class="stat-card"><div class="stat-label">Path Length</div><div class="stat-val pink" id="stat-path">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Big-O complexity -->
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Time Complexity (Big-O)</span></div>
+      <div class="panel-body" style="padding:8px">
+        <table class="complexity-table">
+          <thead><tr><th>Operation</th><th>DS</th><th>O(?)</th></tr></thead>
+          <tbody>
+            <tr><td>Build Graph</td><td style="color:var(--blue)">Adj List</td><td>O(V+E)</td></tr>
+            <tr><td>DFS Generate</td><td style="color:var(--amber)">Stack</td><td>O(V)</td></tr>
+            <tr><td>BFS Solve</td><td style="color:var(--pink)">Queue</td><td>O(V+E)</td></tr>
+            <tr><td>Stack push</td><td style="color:var(--amber)">Array</td><td>O(1)</td></tr>
+            <tr><td>Stack pop</td><td style="color:var(--amber)">Array</td><td>O(1)</td></tr>
+            <tr><td>Queue push</td><td style="color:var(--pink)">Array</td><td>O(1)</td></tr>
+            <tr><td>Queue pop</td><td style="color:var(--pink)">Array</td><td>O(1)</td></tr>
+            <tr><td>Tree valid?</td><td style="color:var(--green)">Spanning</td><td>O(V)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- C Code viewer -->
+    <div class="code-panel">
+      <div class="panel-header" style="background:var(--bg3);border-bottom:1px solid var(--border);padding:9px 14px">
+        <span class="panel-title">C Source Code</span>
+      </div>
+      <div class="code-tabs">
+        <div class="code-tab active" onclick="showCode('graph',this)">Graph</div>
+        <div class="code-tab" onclick="showCode('stack',this)">Stack</div>
+        <div class="code-tab" onclick="showCode('queue',this)">Queue</div>
+        <div class="code-tab" onclick="showCode('dfs',this)">DFS</div>
+        <div class="code-tab" onclick="showCode('bfs',this)">BFS</div>
+      </div>
+      <div class="code-view" id="code-display"></div>
+    </div>
+
+    <!-- Performance bars -->
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Efficiency Analysis</span></div>
+      <div class="panel-body" style="padding:8px">
+        <div class="perf-chart">
+          <div class="perf-bar-row">
+            <span class="perf-bar-label">Visited%</span>
+            <div class="perf-bar-track"><div class="perf-bar-fill" id="pb-vis" style="background:var(--green);width:0%"></div></div>
+            <span class="perf-bar-val" id="pbv-vis">0%</span>
+          </div>
+          <div class="perf-bar-row">
+            <span class="perf-bar-label">Stack max</span>
+            <div class="perf-bar-track"><div class="perf-bar-fill" id="pb-stk" style="background:var(--amber);width:0%"></div></div>
+            <span class="perf-bar-val" id="pbv-stk">0</span>
+          </div>
+          <div class="perf-bar-row">
+            <span class="perf-bar-label">Path eff%</span>
+            <div class="perf-bar-track"><div class="perf-bar-fill" id="pb-pth" style="background:var(--blue);width:0%"></div></div>
+            <span class="perf-bar-val" id="pbv-pth">0%</span>
+          </div>
+          <div class="perf-bar-row">
+            <span class="perf-bar-label">BFS cover</span>
+            <div class="perf-bar-track"><div class="perf-bar-fill" id="pb-bfs" style="background:var(--cyan);width:0%"></div></div>
+            <span class="perf-bar-val" id="pbv-bfs">0%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Applications -->
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">Real-World Applications</span></div>
+      <div class="panel-body" style="padding:8px">
+        <div class="app-use-grid">
+          <div class="app-use-item"><span class="app-use-icon">🎮</span><span class="app-use-label">Game Maps</span>Dungeon gen</div>
+          <div class="app-use-item"><span class="app-use-icon">🤖</span><span class="app-use-label">AI Nav</span>Robot path</div>
+          <div class="app-use-item"><span class="app-use-icon">🌐</span><span class="app-use-label">Networks</span>Routing</div>
+          <div class="app-use-item"><span class="app-use-icon">🧬</span><span class="app-use-label">Simulation</span>DNA folding</div>
+          <div class="app-use-item"><span class="app-use-icon">🏙️</span><span class="app-use-label">City Planning</span>Road grids</div>
+          <div class="app-use-item"><span class="app-use-icon">🔒</span><span class="app-use-label">Encryption</span>Key mazes</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+/* ============================================================
+   MAZE DATA (pre-generated by C binary)
+   ============================================================ */
+const PRESETS = [{"label":"Tiny","rows":6,"cols":10,"seed":1001,"desc":"Quick demo","data":"START 0 0\nREMOVE 0 0 0 1 2\nREMOVE 0 1 1 1 3\nREMOVE 1 1 2 1 4\nREMOVE 2 1 2 0 5\nREMOVE 2 0 3 0 6\nREMOVE 3 0 3 1 7\nREMOVE 3 1 4 1 8\nREMOVE 4 1 5 1 9\nREMOVE 5 1 5 0 10\nREMOVE 5 0 4 0 11\nBACKTRACK 4 0\nBACKTRACK 5 0\nREMOVE 5 1 5 2 10\nREMOVE 5 2 4 2 11\nREMOVE 4 2 3 2 12\nREMOVE 3 2 2 2 13\nREMOVE 2 2 1 2 14\nREMOVE 1 2 1 3 15\nREMOVE 1 3 2 3 16\nREMOVE 2 3 3 3 17\nREMOVE 3 3 3 4 18\nREMOVE 3 4 2 4 19\nREMOVE 2 4 1 4 20\nREMOVE 1 4 0 4 21\nREMOVE 0 4 0 3 22\nREMOVE 0 3 0 2 23\nBACKTRACK 0 2\nBACKTRACK 0 3\nREMOVE 0 4 0 5 22\nREMOVE 0 5 0 6 23\nREMOVE 0 6 0 7 24\nREMOVE 0 7 1 7 25\nREMOVE 1 7 1 6 26\nREMOVE 1 6 2 6 27\nREMOVE 2 6 2 7 28\nREMOVE 2 7 3 7 29\nREMOVE 3 7 4 7 30\nREMOVE 4 7 4 8 31\nREMOVE 4 8 5 8 32\nREMOVE 5 8 5 9 33\nREMOVE 5 9 4 9 34\nREMOVE 4 9 3 9 35\nREMOVE 3 9 3 8 36\nREMOVE 3 8 2 8 37\nREMOVE 2 8 1 8 38\nREMOVE 1 8 0 8 39\nREMOVE 0 8 0 9 40\nREMOVE 0 9 1 9 41\nREMOVE 1 9 2 9 42\nBACKTRACK 2 9\nBACKTRACK 1 9\nBACKTRACK 0 9\nBACKTRACK 0 8\nBACKTRACK 1 8\nBACKTRACK 2 8\nBACKTRACK 3 8\nBACKTRACK 3 9\nBACKTRACK 4 9\nBACKTRACK 5 9\nREMOVE 5 8 5 7 33\nREMOVE 5 7 5 6 34\nREMOVE 5 6 5 5 35\nREMOVE 5 5 5 4 36\nREMOVE 5 4 4 4 37\nREMOVE 4 4 4 3 38\nREMOVE 4 3 5 3 39\nBACKTRACK 5 3\nBACKTRACK 4 3\nREMOVE 4 4 4 5 38\nREMOVE 4 5 4 6 39\nREMOVE 4 6 3 6 40\nREMOVE 3 6 3 5 41\nREMOVE 3 5 2 5 42\nREMOVE 2 5 1 5 43\nBACKTRACK 1 5\nBACKTRACK 2 5\nBACKTRACK 3 5\nBACKTRACK 3 6\nBACKTRACK 4 6\nBACKTRACK 4 5\nBACKTRACK 4 4\nBACKTRACK 5 4\nBACKTRACK 5 5\nBACKTRACK 5 6\nBACKTRACK 5 7\nBACKTRACK 5 8\nBACKTRACK 4 8\nBACKTRACK 4 7\nBACKTRACK 3 7\nBACKTRACK 2 7\nBACKTRACK 2 6\nBACKTRACK 1 6\nBACKTRACK 1 7\nBACKTRACK 0 7\nBACKTRACK 0 6\nBACKTRACK 0 5\nBACKTRACK 0 4\nBACKTRACK 1 4\nBACKTRACK 2 4\nBACKTRACK 3 4\nBACKTRACK 3 3\nBACKTRACK 2 3\nBACKTRACK 1 3\nBACKTRACK 1 2\nBACKTRACK 2 2\nBACKTRACK 3 2\nBACKTRACK 4 2\nBACKTRACK 5 2\nBACKTRACK 5 1\nBACKTRACK 4 1\nBACKTRACK 3 1\nBACKTRACK 3 0\nREMOVE 2 0 1 0 6\nBACKTRACK 1 0\nBACKTRACK 2 0\nBACKTRACK 2 1\nBACKTRACK 1 1\nBACKTRACK 0 1\nBACKTRACK 0 0\nDONE 60 59\nBFS 0 0 0\nBFS 0 1 1\nBFS 1 1 2\nBFS 2 1 3\nBFS 2 0 4\nBFS 1 0 5\nBFS 3 0 5\nBFS 3 1 6\nBFS 4 1 7\nBFS 5 1 8\nBFS 5 2 9\nBFS 5 0 9\nBFS 4 2 10\nBFS 4 0 10\nBFS 3 2 11\nBFS 2 2 12\nBFS 1 2 13\nBFS 1 3 14\nBFS 2 3 15\nBFS 3 3 16\nBFS 3 4 17\nBFS 2 4 18\nBFS 1 4 19\nBFS 0 4 20\nBFS 0 5 21\nBFS 0 3 21\nBFS 0 6 22\nBFS 0 2 22\nBFS 0 7 23\nBFS 1 7 24\nBFS 1 6 25\nBFS 2 6 26\nBFS 2 7 27\nBFS 3 7 28\nBFS 4 7 29\nBFS 4 8 30\nBFS 5 8 31\nBFS 5 9 32\nPATH_LEN 33 38\nPATH 0 0\nPATH 0 1\nPATH 1 1\nPATH 2 1\nPATH 2 0\nPATH 3 0\nPATH 3 1\nPATH 4 1\nPATH 5 1\nPATH 5 2\nPATH 4 2\nPATH 3 2\nPATH 2 2\nPATH 1 2\nPATH 1 3\nPATH 2 3\nPATH 3 3\nPATH 3 4\nPATH 2 4\nPATH 1 4\nPATH 0 4\nPATH 0 5\nPATH 0 6\nPATH 0 7\nPATH 1 7\nPATH 1 6\nPATH 2 6\nPATH 2 7\nPATH 3 7\nPATH 4 7\nPATH 4 8\nPATH 5 8\nPATH 5 9\nWALLS 6 10\nW 1 1 0 1\nW 1 0 1 0\nW 1 1 0 1\nW 1 1 0 0\nW 1 0 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 1 0 1 0\nW 1 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 1 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 0 1 0 0\nW 0 1 1 0\nW 0 1 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 0 0\nW 0 1 1 0\nSTATS nodes=60 edges_in_graph=240 tree_edges=59 backtracks=60"},{"label":"Small","rows":8,"cols":14,"seed":2002,"desc":"Beginner","data":"START 0 0\nREMOVE 0 0 0 1 2\nREMOVE 0 1 1 1 3\nREMOVE 1 1 1 2 4\nREMOVE 1 2 2 2 5\nREMOVE 2 2 2 3 6\nREMOVE 2 3 2 4 7\nREMOVE 2 4 3 4 8\nREMOVE 3 4 3 5 9\nREMOVE 3 5 4 5 10\nREMOVE 4 5 4 6 11\nREMOVE 4 6 5 6 12\nREMOVE 5 6 5 7 13\nREMOVE 5 7 4 7 14\nREMOVE 4 7 4 8 15\nREMOVE 4 8 4 9 16\nREMOVE 4 9 4 10 17\nREMOVE 4 10 5 10 18\nREMOVE 5 10 5 9 19\nREMOVE 5 9 6 9 20\nREMOVE 6 9 6 8 21\nREMOVE 6 8 5 8 22\nBACKTRACK 5 8\nREMOVE 6 8 7 8 22\nREMOVE 7 8 7 7 23\nREMOVE 7 7 7 6 24\nREMOVE 7 6 6 6 25\nREMOVE 6 6 6 7 26\nBACKTRACK 6 7\nREMOVE 6 6 6 5 26\nREMOVE 6 5 5 5 27\nREMOVE 5 5 5 4 28\nREMOVE 5 4 5 3 29\nREMOVE 5 3 6 3 30\nREMOVE 6 3 6 4 31\nREMOVE 6 4 7 4 32\nREMOVE 7 4 7 3 33\nREMOVE 7 3 7 2 34\nREMOVE 7 2 6 2 35\nREMOVE 6 2 6 1 36\nREMOVE 6 1 5 1 37\nREMOVE 5 1 4 1 38\nREMOVE 4 1 3 1 39\nREMOVE 3 1 3 2 40\nREMOVE 3 2 3 3 41\nREMOVE 3 3 4 3 42\nREMOVE 4 3 4 2 43\nREMOVE 4 2 5 2 44\nBACKTRACK 5 2\nBACKTRACK 4 2\nREMOVE 4 3 4 4 43\nBACKTRACK 4 4\nBACKTRACK 4 3\nBACKTRACK 3 3\nBACKTRACK 3 2\nREMOVE 3 1 3 0 40\nREMOVE 3 0 4 0 41\nREMOVE 4 0 5 0 42\nREMOVE 5 0 6 0 43\nREMOVE 6 0 7 0 44\nREMOVE 7 0 7 1 45\nBACKTRACK 7 1\nBACKTRACK 7 0\nBACKTRACK 6 0\nBACKTRACK 5 0\nBACKTRACK 4 0\nREMOVE 3 0 2 0 41\nREMOVE 2 0 1 0 42\nBACKTRACK 1 0\nREMOVE 2 0 2 1 42\nBACKTRACK 2 1\nBACKTRACK 2 0\nBACKTRACK 3 0\nBACKTRACK 3 1\nBACKTRACK 4 1\nBACKTRACK 5 1\nBACKTRACK 6 1\nBACKTRACK 6 2\nBACKTRACK 7 2\nBACKTRACK 7 3\nREMOVE 7 4 7 5 33\nBACKTRACK 7 5\nBACKTRACK 7 4\nBACKTRACK 6 4\nBACKTRACK 6 3\nBACKTRACK 5 3\nBACKTRACK 5 4\nBACKTRACK 5 5\nBACKTRACK 6 5\nBACKTRACK 6 6\nBACKTRACK 7 6\nBACKTRACK 7 7\nREMOVE 7 8 7 9 23\nREMOVE 7 9 7 10 24\nREMOVE 7 10 6 10 25\nREMOVE 6 10 6 11 26\nREMOVE 6 11 5 11 27\nREMOVE 5 11 4 11 28\nREMOVE 4 11 4 12 29\nREMOVE 4 12 5 12 30\nREMOVE 5 12 6 12 31\nREMOVE 6 12 6 13 32\nREMOVE 6 13 5 13 33\nREMOVE 5 13 4 13 34\nREMOVE 4 13 3 13 35\nREMOVE 3 13 2 13 36\nREMOVE 2 13 1 13 37\nREMOVE 1 13 0 13 38\nREMOVE 0 13 0 12 39\nREMOVE 0 12 0 11 40\nREMOVE 0 11 1 11 41\nREMOVE 1 11 1 12 42\nREMOVE 1 12 2 12 43\nREMOVE 2 12 2 11 44\nREMOVE 2 11 3 11 45\nREMOVE 3 11 3 10 46\nREMOVE 3 10 3 9 47\nREMOVE 3 9 3 8 48\nREMOVE 3 8 2 8 49\nREMOVE 2 8 1 8 50\nREMOVE 1 8 0 8 51\nREMOVE 0 8 0 9 52\nREMOVE 0 9 1 9 53\nREMOVE 1 9 2 9 54\nREMOVE 2 9 2 10 55\nREMOVE 2 10 1 10 56\nREMOVE 1 10 0 10 57\nBACKTRACK 0 10\nBACKTRACK 1 10\nBACKTRACK 2 10\nBACKTRACK 2 9\nBACKTRACK 1 9\nBACKTRACK 0 9\nREMOVE 0 8 0 7 52\nREMOVE 0 7 1 7 53\nREMOVE 1 7 2 7 54\nREMOVE 2 7 2 6 55\nREMOVE 2 6 2 5 56\nREMOVE 2 5 1 5 57\nREMOVE 1 5 1 4 58\nREMOVE 1 4 0 4 59\nREMOVE 0 4 0 5 60\nREMOVE 0 5 0 6 61\nREMOVE 0 6 1 6 62\nBACKTRACK 1 6\nBACKTRACK 0 6\nBACKTRACK 0 5\nREMOVE 0 4 0 3 60\nREMOVE 0 3 1 3 61\nBACKTRACK 1 3\nREMOVE 0 3 0 2 61\nBACKTRACK 0 2\nBACKTRACK 0 3\nBACKTRACK 0 4\nBACKTRACK 1 4\nBACKTRACK 1 5\nBACKTRACK 2 5\nREMOVE 2 6 3 6 56\nREMOVE 3 6 3 7 57\nBACKTRACK 3 7\nBACKTRACK 3 6\nBACKTRACK 2 6\nBACKTRACK 2 7\nBACKTRACK 1 7\nBACKTRACK 0 7\nBACKTRACK 0 8\nBACKTRACK 1 8\nBACKTRACK 2 8\nBACKTRACK 3 8\nBACKTRACK 3 9\nBACKTRACK 3 10\nREMOVE 3 11 3 12 46\nBACKTRACK 3 12\nBACKTRACK 3 11\nBACKTRACK 2 11\nBACKTRACK 2 12\nBACKTRACK 1 12\nBACKTRACK 1 11\nBACKTRACK 0 11\nBACKTRACK 0 12\nBACKTRACK 0 13\nBACKTRACK 1 13\nBACKTRACK 2 13\nBACKTRACK 3 13\nBACKTRACK 4 13\nBACKTRACK 5 13\nREMOVE 6 13 7 13 33\nREMOVE 7 13 7 12 34\nREMOVE 7 12 7 11 35\nBACKTRACK 7 11\nBACKTRACK 7 12\nBACKTRACK 7 13\nBACKTRACK 6 13\nBACKTRACK 6 12\nBACKTRACK 5 12\nBACKTRACK 4 12\nBACKTRACK 4 11\nBACKTRACK 5 11\nBACKTRACK 6 11\nBACKTRACK 6 10\nBACKTRACK 7 10\nBACKTRACK 7 9\nBACKTRACK 7 8\nBACKTRACK 6 8\nBACKTRACK 6 9\nBACKTRACK 5 9\nBACKTRACK 5 10\nBACKTRACK 4 10\nBACKTRACK 4 9\nBACKTRACK 4 8\nBACKTRACK 4 7\nBACKTRACK 5 7\nBACKTRACK 5 6\nBACKTRACK 4 6\nBACKTRACK 4 5\nBACKTRACK 3 5\nBACKTRACK 3 4\nBACKTRACK 2 4\nBACKTRACK 2 3\nBACKTRACK 2 2\nBACKTRACK 1 2\nBACKTRACK 1 1\nBACKTRACK 0 1\nBACKTRACK 0 0\nDONE 112 111\nBFS 0 0 0\nBFS 0 1 1\nBFS 1 1 2\nBFS 1 2 3\nBFS 2 2 4\nBFS 2 3 5\nBFS 2 4 6\nBFS 3 4 7\nBFS 3 5 8\nBFS 4 5 9\nBFS 4 6 10\nBFS 5 6 11\nBFS 5 7 12\nBFS 4 7 13\nBFS 4 8 14\nBFS 4 9 15\nBFS 4 10 16\nBFS 5 10 17\nBFS 5 9 18\nBFS 6 9 19\nBFS 6 8 20\nBFS 5 8 21\nBFS 7 8 21\nBFS 7 9 22\nBFS 7 7 22\nBFS 7 10 23\nBFS 7 6 23\nBFS 6 10 24\nBFS 6 6 24\nBFS 6 11 25\nBFS 6 7 25\nBFS 6 5 25\nBFS 5 11 26\nBFS 5 5 26\nBFS 4 11 27\nBFS 5 4 27\nBFS 4 12 28\nBFS 5 3 28\nBFS 5 12 29\nBFS 6 3 29\nBFS 6 12 30\nBFS 6 4 30\nBFS 6 13 31\nBFS 7 4 31\nBFS 5 13 32\nBFS 7 13 32\nPATH_LEN 33 46\nPATH 0 0\nPATH 0 1\nPATH 1 1\nPATH 1 2\nPATH 2 2\nPATH 2 3\nPATH 2 4\nPATH 3 4\nPATH 3 5\nPATH 4 5\nPATH 4 6\nPATH 5 6\nPATH 5 7\nPATH 4 7\nPATH 4 8\nPATH 4 9\nPATH 4 10\nPATH 5 10\nPATH 5 9\nPATH 6 9\nPATH 6 8\nPATH 7 8\nPATH 7 9\nPATH 7 10\nPATH 6 10\nPATH 6 11\nPATH 5 11\nPATH 4 11\nPATH 4 12\nPATH 5 12\nPATH 6 12\nPATH 6 13\nPATH 7 13\nWALLS 8 14\nW 1 1 0 1\nW 1 0 1 0\nW 1 1 0 1\nW 1 0 0 0\nW 1 0 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 1 0 0 0\nW 1 0 1 0\nW 1 0 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 0 0 1\nW 1 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 0 1\nW 1 0 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 0 0\nW 1 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 0 0\nW 1 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 1 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 0 1 1 0\nW 1 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 0 0\nW 1 1 1 0\nW 0 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 0 0 1 0\nW 0 1 0 1\nW 1 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 0 0\nW 1 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 1 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nSTATS nodes=112 edges_in_graph=448 tree_edges=111 backtracks=112"},{"label":"Medium","rows":12,"cols":20,"seed":3003,"desc":"Standard","data":"START 0 0\nREMOVE 0 0 0 1 2\nREMOVE 0 1 0 2 3\nREMOVE 0 2 0 3 4\nREMOVE 0 3 0 4 5\nREMOVE 0 4 1 4 6\nREMOVE 1 4 1 3 7\nREMOVE 1 3 2 3 8\nREMOVE 2 3 3 3 9\nREMOVE 3 3 3 4 10\nREMOVE 3 4 2 4 11\nREMOVE 2 4 2 5 12\nREMOVE 2 5 3 5 13\nREMOVE 3 5 3 6 14\nREMOVE 3 6 3 7 15\nREMOVE 3 7 3 8 16\nREMOVE 3 8 3 9 17\nREMOVE 3 9 3 10 18\nREMOVE 3 10 3 11 19\nREMOVE 3 11 3 12 20\nREMOVE 3 12 4 12 21\nREMOVE 4 12 4 11 22\nREMOVE 4 11 4 10 23\nREMOVE 4 10 5 10 24\nREMOVE 5 10 5 9 25\nREMOVE 5 9 5 8 26\nREMOVE 5 8 6 8 27\nREMOVE 6 8 6 7 28\nREMOVE 6 7 5 7 29\nREMOVE 5 7 4 7 30\nREMOVE 4 7 4 8 31\nREMOVE 4 8 4 9 32\nBACKTRACK 4 9\nBACKTRACK 4 8\nREMOVE 4 7 4 6 31\nREMOVE 4 6 5 6 32\nREMOVE 5 6 6 6 33\nREMOVE 6 6 7 6 34\nREMOVE 7 6 7 5 35\nREMOVE 7 5 8 5 36\nREMOVE 8 5 8 4 37\nREMOVE 8 4 8 3 38\nREMOVE 8 3 8 2 39\nREMOVE 8 2 8 1 40\nREMOVE 8 1 7 1 41\nREMOVE 7 1 6 1 42\nREMOVE 6 1 5 1 43\nREMOVE 5 1 5 2 44\nREMOVE 5 2 5 3 45\nREMOVE 5 3 4 3 46\nREMOVE 4 3 4 2 47\nREMOVE 4 2 4 1 48\nREMOVE 4 1 3 1 49\nREMOVE 3 1 3 0 50\nREMOVE 3 0 2 0 51\nREMOVE 2 0 2 1 52\nREMOVE 2 1 2 2 53\nREMOVE 2 2 3 2 54\nBACKTRACK 3 2\nREMOVE 2 2 1 2 54\nREMOVE 1 2 1 1 55\nREMOVE 1 1 1 0 56\nBACKTRACK 1 0\nBACKTRACK 1 1\nBACKTRACK 1 2\nBACKTRACK 2 2\nBACKTRACK 2 1\nBACKTRACK 2 0\nREMOVE 3 0 4 0 51\nREMOVE 4 0 5 0 52\nREMOVE 5 0 6 0 53\nREMOVE 6 0 7 0 54\nREMOVE 7 0 8 0 55\nREMOVE 8 0 9 0 56\nREMOVE 9 0 10 0 57\nREMOVE 10 0 11 0 58\nREMOVE 11 0 11 1 59\nREMOVE 11 1 10 1 60\nREMOVE 10 1 10 2 61\nREMOVE 10 2 9 2 62\nREMOVE 9 2 9 3 63\nREMOVE 9 3 10 3 64\nREMOVE 10 3 10 4 65\nREMOVE 10 4 10 5 66\nREMOVE 10 5 10 6 67\nREMOVE 10 6 10 7 68\nREMOVE 10 7 11 7 69\nREMOVE 11 7 11 6 70\nREMOVE 11 6 11 5 71\nREMOVE 11 5 11 4 72\nREMOVE 11 4 11 3 73\nREMOVE 11 3 11 2 74\nBACKTRACK 11 2\nBACKTRACK 11 3\nBACKTRACK 11 4\nBACKTRACK 11 5\nBACKTRACK 11 6\nREMOVE 11 7 11 8 70\nREMOVE 11 8 11 9 71\nREMOVE 11 9 11 10 72\nREMOVE 11 10 11 11 73\nREMOVE 11 11 10 11 74\nREMOVE 10 11 9 11 75\nREMOVE 9 11 9 12 76\nREMOVE 9 12 9 13 77\nREMOVE 9 13 8 13 78\nREMOVE 8 13 8 14 79\nREMOVE 8 14 7 14 80\nREMOVE 7 14 6 14 81\nREMOVE 6 14 6 15 82\nREMOVE 6 15 5 15 83\nREMOVE 5 15 4 15 84\nREMOVE 4 15 3 15 85\nREMOVE 3 15 2 15 86\nREMOVE 2 15 2 14 87\nREMOVE 2 14 3 14 88\nREMOVE 3 14 3 13 89\nREMOVE 3 13 4 13 90\nREMOVE 4 13 5 13 91\nREMOVE 5 13 6 13 92\nREMOVE 6 13 7 13 93\nREMOVE 7 13 7 12 94\nREMOVE 7 12 7 11 95\nREMOVE 7 11 8 11 96\nREMOVE 8 11 8 10 97\nREMOVE 8 10 8 9 98\nREMOVE 8 9 7 9 99\nREMOVE 7 9 7 8 100\nREMOVE 7 8 8 8 101\nREMOVE 8 8 8 7 102\nREMOVE 8 7 8 6 103\nREMOVE 8 6 9 6 104\nREMOVE 9 6 9 7 105\nREMOVE 9 7 9 8 106\nREMOVE 9 8 10 8 107\nREMOVE 10 8 10 9 108\nREMOVE 10 9 9 9 109\nREMOVE 9 9 9 10 110\nREMOVE 9 10 10 10 111\nBACKTRACK 10 10\nBACKTRACK 9 10\nBACKTRACK 9 9\nBACKTRACK 10 9\nBACKTRACK 10 8\nBACKTRACK 9 8\nBACKTRACK 9 7\nREMOVE 9 6 9 5 105\nREMOVE 9 5 9 4 106\nBACKTRACK 9 4\nBACKTRACK 9 5\nBACKTRACK 9 6\nBACKTRACK 8 6\nREMOVE 8 7 7 7 103\nBACKTRACK 7 7\nBACKTRACK 8 7\nBACKTRACK 8 8\nBACKTRACK 7 8\nREMOVE 7 9 6 9 100\nREMOVE 6 9 6 10 101\nREMOVE 6 10 7 10 102\nBACKTRACK 7 10\nREMOVE 6 10 6 11 102\nREMOVE 6 11 6 12 103\nREMOVE 6 12 5 12 104\nREMOVE 5 12 5 11 105\nBACKTRACK 5 11\nBACKTRACK 5 12\nBACKTRACK 6 12\nBACKTRACK 6 11\nBACKTRACK 6 10\nBACKTRACK 6 9\nBACKTRACK 7 9\nBACKTRACK 8 9\nBACKTRACK 8 10\nREMOVE 8 11 8 12 97\nBACKTRACK 8 12\nBACKTRACK 8 11\nBACKTRACK 7 11\nBACKTRACK 7 12\nBACKTRACK 7 13\nBACKTRACK 6 13\nREMOVE 5 13 5 14 92\nREMOVE 5 14 4 14 93\nBACKTRACK 4 14\nBACKTRACK 5 14\nBACKTRACK 5 13\nBACKTRACK 4 13\nREMOVE 3 13 2 13 90\nREMOVE 2 13 1 13 91\nREMOVE 1 13 1 12 92\nREMOVE 1 12 2 12 93\nREMOVE 2 12 2 11 94\nREMOVE 2 11 1 11 95\nREMOVE 1 11 1 10 96\nREMOVE 1 10 0 10 97\nREMOVE 0 10 0 11 98\nREMOVE 0 11 0 12 99\nREMOVE 0 12 0 13 100\nREMOVE 0 13 0 14 101\nREMOVE 0 14 1 14 102\nREMOVE 1 14 1 15 103\nREMOVE 1 15 1 16 104\nREMOVE 1 16 0 16 105\nREMOVE 0 16 0 15 106\nBACKTRACK 0 15\nREMOVE 0 16 0 17 106\nREMOVE 0 17 0 18 107\nREMOVE 0 18 0 19 108\nREMOVE 0 19 1 19 109\nREMOVE 1 19 2 19 110\nREMOVE 2 19 3 19 111\nREMOVE 3 19 4 19 112\nREMOVE 4 19 5 19 113\nREMOVE 5 19 6 19 114\nREMOVE 6 19 6 18 115\nREMOVE 6 18 7 18 116\nREMOVE 7 18 8 18 117\nREMOVE 8 18 8 17 118\nREMOVE 8 17 9 17 119\nREMOVE 9 17 9 16 120\nREMOVE 9 16 9 15 121\nREMOVE 9 15 8 15 122\nREMOVE 8 15 8 16 123\nREMOVE 8 16 7 16 124\nREMOVE 7 16 7 15 125\nBACKTRACK 7 15\nREMOVE 7 16 7 17 125\nREMOVE 7 17 6 17 126\nREMOVE 6 17 5 17 127\nREMOVE 5 17 5 16 128\nREMOVE 5 16 6 16 129\nBACKTRACK 6 16\nREMOVE 5 16 4 16 129\nREMOVE 4 16 4 17 130\nREMOVE 4 17 4 18 131\nREMOVE 4 18 5 18 132\nBACKTRACK 5 18\nREMOVE 4 18 3 18 132\nREMOVE 3 18 2 18 133\nREMOVE 2 18 2 17 134\nREMOVE 2 17 2 16 135\nREMOVE 2 16 3 16 136\nREMOVE 3 16 3 17 137\nBACKTRACK 3 17\nBACKTRACK 3 16\nBACKTRACK 2 16\nREMOVE 2 17 1 17 135\nREMOVE 1 17 1 18 136\nBACKTRACK 1 18\nBACKTRACK 1 17\nBACKTRACK 2 17\nBACKTRACK 2 18\nBACKTRACK 3 18\nBACKTRACK 4 18\nBACKTRACK 4 17\nBACKTRACK 4 16\nBACKTRACK 5 16\nBACKTRACK 5 17\nBACKTRACK 6 17\nBACKTRACK 7 17\nBACKTRACK 7 16\nBACKTRACK 8 16\nBACKTRACK 8 15\nREMOVE 9 15 10 15 122\nREMOVE 10 15 10 14 123\nREMOVE 10 14 11 14 124\nREMOVE 11 14 11 13 125\nREMOVE 11 13 10 13 126\nREMOVE 10 13 10 12 127\nREMOVE 10 12 11 12 128\nBACKTRACK 11 12\nBACKTRACK 10 12\nBACKTRACK 10 13\nBACKTRACK 11 13\nREMOVE 11 14 11 15 125\nREMOVE 11 15 11 16 126\nREMOVE 11 16 10 16 127\nREMOVE 10 16 10 17 128\nREMOVE 10 17 10 18 129\nREMOVE 10 18 9 18 130\nREMOVE 9 18 9 19 131\nREMOVE 9 19 8 19 132\nREMOVE 8 19 7 19 133\nBACKTRACK 7 19\nBACKTRACK 8 19\nREMOVE 9 19 10 19 132\nREMOVE 10 19 11 19 133\nREMOVE 11 19 11 18 134\nREMOVE 11 18 11 17 135\nBACKTRACK 11 17\nBACKTRACK 11 18\nBACKTRACK 11 19\nBACKTRACK 10 19\nBACKTRACK 9 19\nBACKTRACK 9 18\nBACKTRACK 10 18\nBACKTRACK 10 17\nBACKTRACK 10 16\nBACKTRACK 11 16\nBACKTRACK 11 15\nBACKTRACK 11 14\nREMOVE 10 14 9 14 124\nBACKTRACK 9 14\nBACKTRACK 10 14\nBACKTRACK 10 15\nBACKTRACK 9 15\nBACKTRACK 9 16\nBACKTRACK 9 17\nBACKTRACK 8 17\nBACKTRACK 8 18\nBACKTRACK 7 18\nBACKTRACK 6 18\nBACKTRACK 6 19\nBACKTRACK 5 19\nBACKTRACK 4 19\nBACKTRACK 3 19\nBACKTRACK 2 19\nBACKTRACK 1 19\nBACKTRACK 0 19\nBACKTRACK 0 18\nBACKTRACK 0 17\nBACKTRACK 0 16\nBACKTRACK 1 16\nBACKTRACK 1 15\nBACKTRACK 1 14\nBACKTRACK 0 14\nBACKTRACK 0 13\nBACKTRACK 0 12\nBACKTRACK 0 11\nREMOVE 0 10 0 9 98\nREMOVE 0 9 1 9 99\nREMOVE 1 9 1 8 100\nREMOVE 1 8 2 8 101\nREMOVE 2 8 2 7 102\nREMOVE 2 7 1 7 103\nREMOVE 1 7 1 6 104\nREMOVE 1 6 0 6 105\nREMOVE 0 6 0 5 106\nREMOVE 0 5 1 5 107\nBACKTRACK 1 5\nBACKTRACK 0 5\nREMOVE 0 6 0 7 106\nREMOVE 0 7 0 8 107\nBACKTRACK 0 8\nBACKTRACK 0 7\nBACKTRACK 0 6\nREMOVE 1 6 2 6 105\nBACKTRACK 2 6\nBACKTRACK 1 6\nBACKTRACK 1 7\nBACKTRACK 2 7\nREMOVE 2 8 2 9 102\nREMOVE 2 9 2 10 103\nBACKTRACK 2 10\nBACKTRACK 2 9\nBACKTRACK 2 8\nBACKTRACK 1 8\nBACKTRACK 1 9\nBACKTRACK 0 9\nBACKTRACK 0 10\nBACKTRACK 1 10\nBACKTRACK 1 11\nBACKTRACK 2 11\nBACKTRACK 2 12\nBACKTRACK 1 12\nBACKTRACK 1 13\nBACKTRACK 2 13\nBACKTRACK 3 13\nBACKTRACK 3 14\nBACKTRACK 2 14\nBACKTRACK 2 15\nBACKTRACK 3 15\nBACKTRACK 4 15\nBACKTRACK 5 15\nBACKTRACK 6 15\nBACKTRACK 6 14\nBACKTRACK 7 14\nBACKTRACK 8 14\nBACKTRACK 8 13\nBACKTRACK 9 13\nBACKTRACK 9 12\nBACKTRACK 9 11\nBACKTRACK 10 11\nBACKTRACK 11 11\nBACKTRACK 11 10\nBACKTRACK 11 9\nBACKTRACK 11 8\nBACKTRACK 11 7\nBACKTRACK 10 7\nBACKTRACK 10 6\nBACKTRACK 10 5\nBACKTRACK 10 4\nBACKTRACK 10 3\nBACKTRACK 9 3\nREMOVE 9 2 9 1 63\nBACKTRACK 9 1\nBACKTRACK 9 2\nBACKTRACK 10 2\nBACKTRACK 10 1\nBACKTRACK 11 1\nBACKTRACK 11 0\nBACKTRACK 10 0\nBACKTRACK 9 0\nBACKTRACK 8 0\nBACKTRACK 7 0\nBACKTRACK 6 0\nBACKTRACK 5 0\nBACKTRACK 4 0\nBACKTRACK 3 0\nBACKTRACK 3 1\nBACKTRACK 4 1\nBACKTRACK 4 2\nREMOVE 4 3 4 4 47\nREMOVE 4 4 4 5 48\nREMOVE 4 5 5 5 49\nREMOVE 5 5 6 5 50\nREMOVE 6 5 6 4 51\nREMOVE 6 4 7 4 52\nREMOVE 7 4 7 3 53\nREMOVE 7 3 7 2 54\nREMOVE 7 2 6 2 55\nREMOVE 6 2 6 3 56\nBACKTRACK 6 3\nBACKTRACK 6 2\nBACKTRACK 7 2\nBACKTRACK 7 3\nBACKTRACK 7 4\nREMOVE 6 4 5 4 52\nBACKTRACK 5 4\nBACKTRACK 6 4\nBACKTRACK 6 5\nBACKTRACK 5 5\nBACKTRACK 4 5\nBACKTRACK 4 4\nBACKTRACK 4 3\nBACKTRACK 5 3\nBACKTRACK 5 2\nBACKTRACK 5 1\nBACKTRACK 6 1\nBACKTRACK 7 1\nBACKTRACK 8 1\nBACKTRACK 8 2\nBACKTRACK 8 3\nBACKTRACK 8 4\nBACKTRACK 8 5\nBACKTRACK 7 5\nBACKTRACK 7 6\nBACKTRACK 6 6\nBACKTRACK 5 6\nBACKTRACK 4 6\nBACKTRACK 4 7\nBACKTRACK 5 7\nBACKTRACK 6 7\nBACKTRACK 6 8\nBACKTRACK 5 8\nBACKTRACK 5 9\nBACKTRACK 5 10\nBACKTRACK 4 10\nBACKTRACK 4 11\nBACKTRACK 4 12\nBACKTRACK 3 12\nBACKTRACK 3 11\nBACKTRACK 3 10\nBACKTRACK 3 9\nBACKTRACK 3 8\nBACKTRACK 3 7\nBACKTRACK 3 6\nBACKTRACK 3 5\nBACKTRACK 2 5\nBACKTRACK 2 4\nBACKTRACK 3 4\nBACKTRACK 3 3\nBACKTRACK 2 3\nBACKTRACK 1 3\nBACKTRACK 1 4\nBACKTRACK 0 4\nBACKTRACK 0 3\nBACKTRACK 0 2\nBACKTRACK 0 1\nBACKTRACK 0 0\nDONE 240 239\nBFS 0 0 0\nBFS 0 1 1\nBFS 0 2 2\nBFS 0 3 3\nBFS 0 4 4\nBFS 1 4 5\nBFS 1 3 6\nBFS 2 3 7\nBFS 3 3 8\nBFS 3 4 9\nBFS 2 4 10\nBFS 2 5 11\nBFS 3 5 12\nBFS 3 6 13\nBFS 3 7 14\nBFS 3 8 15\nBFS 3 9 16\nBFS 3 10 17\nBFS 3 11 18\nBFS 3 12 19\nBFS 4 12 20\nBFS 4 11 21\nBFS 4 10 22\nBFS 5 10 23\nBFS 5 9 24\nBFS 5 8 25\nBFS 6 8 26\nBFS 6 7 27\nBFS 5 7 28\nBFS 4 7 29\nBFS 4 8 30\nBFS 4 6 30\nBFS 4 9 31\nBFS 5 6 31\nBFS 6 6 32\nBFS 7 6 33\nBFS 7 5 34\nBFS 8 5 35\nBFS 8 4 36\nBFS 8 3 37\nBFS 8 2 38\nBFS 8 1 39\nBFS 7 1 40\nBFS 6 1 41\nBFS 5 1 42\nBFS 5 2 43\nBFS 5 3 44\nBFS 4 3 45\nBFS 4 4 46\nBFS 4 2 46\nBFS 4 5 47\nBFS 4 1 47\nBFS 5 5 48\nBFS 3 1 48\nBFS 6 5 49\nBFS 3 0 49\nBFS 6 4 50\nBFS 2 0 50\nBFS 4 0 50\nBFS 5 4 51\nBFS 7 4 51\nBFS 2 1 51\nBFS 5 0 51\nBFS 7 3 52\nBFS 2 2 52\nBFS 6 0 52\nBFS 7 2 53\nBFS 1 2 53\nBFS 3 2 53\nBFS 7 0 53\nBFS 6 2 54\nBFS 1 1 54\nBFS 8 0 54\nBFS 6 3 55\nBFS 1 0 55\nBFS 9 0 55\nBFS 10 0 56\nBFS 11 0 57\nBFS 11 1 58\nBFS 10 1 59\nBFS 10 2 60\nBFS 9 2 61\nBFS 9 3 62\nBFS 9 1 62\nBFS 10 3 63\nBFS 10 4 64\nBFS 10 5 65\nBFS 10 6 66\nBFS 10 7 67\nBFS 11 7 68\nBFS 11 8 69\nBFS 11 6 69\nBFS 11 9 70\nBFS 11 5 70\nBFS 11 10 71\nBFS 11 4 71\nBFS 11 11 72\nBFS 11 3 72\nBFS 10 11 73\nBFS 11 2 73\nBFS 9 11 74\nBFS 9 12 75\nBFS 9 13 76\nBFS 8 13 77\nBFS 8 14 78\nBFS 7 14 79\nBFS 6 14 80\nBFS 6 15 81\nBFS 5 15 82\nBFS 4 15 83\nBFS 3 15 84\nBFS 2 15 85\nBFS 2 14 86\nBFS 3 14 87\nBFS 3 13 88\nBFS 2 13 89\nBFS 4 13 89\nBFS 1 13 90\nBFS 5 13 90\nBFS 1 12 91\nBFS 6 13 91\nBFS 5 14 91\nBFS 2 12 92\nBFS 7 13 92\nBFS 4 14 92\nBFS 2 11 93\nBFS 7 12 93\nBFS 1 11 94\nBFS 7 11 94\nBFS 1 10 95\nBFS 8 11 95\nBFS 0 10 96\nBFS 8 12 96\nBFS 8 10 96\nBFS 0 11 97\nBFS 0 9 97\nBFS 8 9 97\nBFS 0 12 98\nBFS 1 9 98\nBFS 7 9 98\nBFS 0 13 99\nBFS 1 8 99\nBFS 6 9 99\nBFS 7 8 99\nBFS 0 14 100\nBFS 2 8 100\nBFS 6 10 100\nBFS 8 8 100\nBFS 1 14 101\nBFS 2 9 101\nBFS 2 7 101\nBFS 7 10 101\nBFS 6 11 101\nBFS 8 7 101\nBFS 1 15 102\nBFS 2 10 102\nBFS 1 7 102\nBFS 6 12 102\nBFS 7 7 102\nBFS 8 6 102\nBFS 1 16 103\nBFS 1 6 103\nBFS 5 12 103\nBFS 9 6 103\nBFS 0 16 104\nBFS 0 6 104\nBFS 2 6 104\nBFS 5 11 104\nBFS 9 7 104\nBFS 9 5 104\nBFS 0 17 105\nBFS 0 15 105\nBFS 0 7 105\nBFS 0 5 105\nBFS 9 8 105\nBFS 9 4 105\nBFS 0 18 106\nBFS 0 8 106\nBFS 1 5 106\nBFS 10 8 106\nBFS 0 19 107\nBFS 10 9 107\nBFS 1 19 108\nBFS 9 9 108\nBFS 2 19 109\nBFS 9 10 109\nBFS 3 19 110\nBFS 10 10 110\nBFS 4 19 111\nBFS 5 19 112\nBFS 6 19 113\nBFS 6 18 114\nBFS 7 18 115\nBFS 8 18 116\nBFS 8 17 117\nBFS 9 17 118\nBFS 9 16 119\nBFS 9 15 120\nBFS 8 15 121\nBFS 10 15 121\nBFS 8 16 122\nBFS 10 14 122\nBFS 7 16 123\nBFS 9 14 123\nBFS 11 14 123\nBFS 7 17 124\nBFS 7 15 124\nBFS 11 15 124\nBFS 11 13 124\nBFS 6 17 125\nBFS 11 16 125\nBFS 10 13 125\nBFS 5 17 126\nBFS 10 16 126\nBFS 10 12 126\nBFS 5 16 127\nBFS 10 17 127\nBFS 11 12 127\nBFS 4 16 128\nBFS 6 16 128\nBFS 10 18 128\nBFS 4 17 129\nBFS 9 18 129\nBFS 4 18 130\nBFS 9 19 130\nBFS 3 18 131\nBFS 5 18 131\nBFS 8 19 131\nBFS 10 19 131\nBFS 2 18 132\nBFS 7 19 132\nBFS 11 19 132\nPATH_LEN 133 232\nPATH 0 0\nPATH 0 1\nPATH 0 2\nPATH 0 3\nPATH 0 4\nPATH 1 4\nPATH 1 3\nPATH 2 3\nPATH 3 3\nPATH 3 4\nPATH 2 4\nPATH 2 5\nPATH 3 5\nPATH 3 6\nPATH 3 7\nPATH 3 8\nPATH 3 9\nPATH 3 10\nPATH 3 11\nPATH 3 12\nPATH 4 12\nPATH 4 11\nPATH 4 10\nPATH 5 10\nPATH 5 9\nPATH 5 8\nPATH 6 8\nPATH 6 7\nPATH 5 7\nPATH 4 7\nPATH 4 6\nPATH 5 6\nPATH 6 6\nPATH 7 6\nPATH 7 5\nPATH 8 5\nPATH 8 4\nPATH 8 3\nPATH 8 2\nPATH 8 1\nPATH 7 1\nPATH 6 1\nPATH 5 1\nPATH 5 2\nPATH 5 3\nPATH 4 3\nPATH 4 2\nPATH 4 1\nPATH 3 1\nPATH 3 0\nPATH 4 0\nPATH 5 0\nPATH 6 0\nPATH 7 0\nPATH 8 0\nPATH 9 0\nPATH 10 0\nPATH 11 0\nPATH 11 1\nPATH 10 1\nPATH 10 2\nPATH 9 2\nPATH 9 3\nPATH 10 3\nPATH 10 4\nPATH 10 5\nPATH 10 6\nPATH 10 7\nPATH 11 7\nPATH 11 8\nPATH 11 9\nPATH 11 10\nPATH 11 11\nPATH 10 11\nPATH 9 11\nPATH 9 12\nPATH 9 13\nPATH 8 13\nPATH 8 14\nPATH 7 14\nPATH 6 14\nPATH 6 15\nPATH 5 15\nPATH 4 15\nPATH 3 15\nPATH 2 15\nPATH 2 14\nPATH 3 14\nPATH 3 13\nPATH 2 13\nPATH 1 13\nPATH 1 12\nPATH 2 12\nPATH 2 11\nPATH 1 11\nPATH 1 10\nPATH 0 10\nPATH 0 11\nPATH 0 12\nPATH 0 13\nPATH 0 14\nPATH 1 14\nPATH 1 15\nPATH 1 16\nPATH 0 16\nPATH 0 17\nPATH 0 18\nPATH 0 19\nPATH 1 19\nPATH 2 19\nPATH 3 19\nPATH 4 19\nPATH 5 19\nPATH 6 19\nPATH 6 18\nPATH 7 18\nPATH 8 18\nPATH 8 17\nPATH 9 17\nPATH 9 16\nPATH 9 15\nPATH 10 15\nPATH 10 14\nPATH 11 14\nPATH 11 15\nPATH 11 16\nPATH 10 16\nPATH 10 17\nPATH 10 18\nPATH 9 18\nPATH 9 19\nPATH 10 19\nPATH 11 19\nWALLS 12 20\nW 1 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 1 0 0 0\nW 1 1 0 0\nW 1 1 1 0\nW 1 0 0 1\nW 1 0 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 1 1 0 1\nW 1 0 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 1 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 1 1\nW 0 0 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 0 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 0 1 1 1\nW 0 1 0 1\nW 0 1 0 0\nW 1 1 0 0\nW 1 1 1 0\nW 0 1 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 0 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 0 0 0 1\nW 1 0 1 0\nW 0 1 1 1\nW 0 1 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 1 0 0 0\nW 1 1 0 0\nW 1 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 1 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 0 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 1 1 0 1\nW 1 0 1 0\nW 0 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 0 1\nW 1 0 1 0\nW 0 1 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 1 1 1 0\nW 0 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 1 0 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 1 1\nW 1 0 0 1\nW 0 0 1 0\nW 0 1 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 1 1 0 1\nW 1 0 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 1 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 0 1 0 0\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 0 0\nW 1 1 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 1 0 1\nW 1 0 0 0\nW 1 0 1 0\nW 1 1 0 1\nW 1 1 0 0\nW 0 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 1 1\nW 0 0 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 0 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 0 1 1 0\nW 0 1 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 0 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 0 1 1 0\nW 1 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 0 1 1 1\nW 0 1 0 1\nW 0 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 1 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nSTATS nodes=240 edges_in_graph=960 tree_edges=239 backtracks=240"},{"label":"Large","rows":18,"cols":28,"seed":4004,"desc":"Challenge","data":"START 0 0\nREMOVE 0 0 1 0 2\nREMOVE 1 0 2 0 3\nREMOVE 2 0 2 1 4\nREMOVE 2 1 2 2 5\nREMOVE 2 2 1 2 6\nREMOVE 1 2 1 1 7\nREMOVE 1 1 0 1 8\nREMOVE 0 1 0 2 9\nREMOVE 0 2 0 3 10\nREMOVE 0 3 1 3 11\nREMOVE 1 3 1 4 12\nREMOVE 1 4 1 5 13\nREMOVE 1 5 1 6 14\nREMOVE 1 6 1 7 15\nREMOVE 1 7 2 7 16\nREMOVE 2 7 3 7 17\nREMOVE 3 7 4 7 18\nREMOVE 4 7 4 6 19\nREMOVE 4 6 5 6 20\nREMOVE 5 6 5 7 21\nREMOVE 5 7 5 8 22\nREMOVE 5 8 6 8 23\nREMOVE 6 8 6 7 24\nREMOVE 6 7 7 7 25\nREMOVE 7 7 7 8 26\nREMOVE 7 8 7 9 27\nREMOVE 7 9 8 9 28\nREMOVE 8 9 8 8 29\nREMOVE 8 8 8 7 30\nREMOVE 8 7 9 7 31\nREMOVE 9 7 10 7 32\nREMOVE 10 7 10 6 33\nREMOVE 10 6 11 6 34\nREMOVE 11 6 12 6 35\nREMOVE 12 6 12 7 36\nREMOVE 12 7 13 7 37\nREMOVE 13 7 14 7 38\nREMOVE 14 7 14 6 39\nREMOVE 14 6 13 6 40\nREMOVE 13 6 13 5 41\nREMOVE 13 5 14 5 42\nREMOVE 14 5 14 4 43\nREMOVE 14 4 14 3 44\nREMOVE 14 3 13 3 45\nREMOVE 13 3 12 3 46\nREMOVE 12 3 11 3 47\nREMOVE 11 3 11 2 48\nREMOVE 11 2 10 2 49\nREMOVE 10 2 9 2 50\nREMOVE 9 2 8 2 51\nREMOVE 8 2 8 1 52\nREMOVE 8 1 7 1 53\nREMOVE 7 1 7 0 54\nREMOVE 7 0 8 0 55\nREMOVE 8 0 9 0 56\nREMOVE 9 0 9 1 57\nREMOVE 9 1 10 1 58\nREMOVE 10 1 10 0 59\nREMOVE 10 0 11 0 60\nREMOVE 11 0 11 1 61\nREMOVE 11 1 12 1 62\nREMOVE 12 1 12 0 63\nREMOVE 12 0 13 0 64\nREMOVE 13 0 13 1 65\nREMOVE 13 1 14 1 66\nREMOVE 14 1 14 0 67\nREMOVE 14 0 15 0 68\nREMOVE 15 0 16 0 69\nREMOVE 16 0 16 1 70\nREMOVE 16 1 15 1 71\nREMOVE 15 1 15 2 72\nREMOVE 15 2 16 2 73\nREMOVE 16 2 16 3 74\nREMOVE 16 3 16 4 75\nREMOVE 16 4 16 5 76\nREMOVE 16 5 16 6 77\nREMOVE 16 6 16 7 78\nREMOVE 16 7 16 8 79\nREMOVE 16 8 15 8 80\nREMOVE 15 8 15 7 81\nREMOVE 15 7 15 6 82\nREMOVE 15 6 15 5 83\nREMOVE 15 5 15 4 84\nREMOVE 15 4 15 3 85\nBACKTRACK 15 3\nBACKTRACK 15 4\nBACKTRACK 15 5\nBACKTRACK 15 6\nBACKTRACK 15 7\nREMOVE 15 8 15 9 81\nREMOVE 15 9 16 9 82\nREMOVE 16 9 16 10 83\nREMOVE 16 10 17 10 84\nREMOVE 17 10 17 11 85\nREMOVE 17 11 17 12 86\nREMOVE 17 12 16 12 87\nREMOVE 16 12 15 12 88\nREMOVE 15 12 15 11 89\nREMOVE 15 11 14 11 90\nREMOVE 14 11 14 12 91\nREMOVE 14 12 13 12 92\nREMOVE 13 12 12 12 93\nREMOVE 12 12 12 13 94\nREMOVE 12 13 13 13 95\nREMOVE 13 13 14 13 96\nREMOVE 14 13 15 13 97\nREMOVE 15 13 16 13 98\nREMOVE 16 13 16 14 99\nREMOVE 16 14 16 15 100\nREMOVE 16 15 15 15 101\nREMOVE 15 15 15 16 102\nREMOVE 15 16 15 17 103\nREMOVE 15 17 15 18 104\nREMOVE 15 18 14 18 105\nREMOVE 14 18 14 19 106\nREMOVE 14 19 15 19 107\nREMOVE 15 19 15 20 108\nREMOVE 15 20 16 20 109\nREMOVE 16 20 16 19 110\nREMOVE 16 19 16 18 111\nREMOVE 16 18 16 17 112\nREMOVE 16 17 16 16 113\nREMOVE 16 16 17 16 114\nREMOVE 17 16 17 17 115\nREMOVE 17 17 17 18 116\nREMOVE 17 18 17 19 117\nREMOVE 17 19 17 20 118\nREMOVE 17 20 17 21 119\nREMOVE 17 21 17 22 120\nREMOVE 17 22 16 22 121\nREMOVE 16 22 16 23 122\nREMOVE 16 23 16 24 123\nREMOVE 16 24 17 24 124\nREMOVE 17 24 17 23 125\nBACKTRACK 17 23\nREMOVE 17 24 17 25 125\nREMOVE 17 25 17 26 126\nREMOVE 17 26 17 27 127\nREMOVE 17 27 16 27 128\nREMOVE 16 27 15 27 129\nREMOVE 15 27 15 26 130\nREMOVE 15 26 16 26 131\nREMOVE 16 26 16 25 132\nREMOVE 16 25 15 25 133\nREMOVE 15 25 14 25 134\nREMOVE 14 25 14 26 135\nREMOVE 14 26 13 26 136\nREMOVE 13 26 13 27 137\nREMOVE 13 27 14 27 138\nBACKTRACK 14 27\nREMOVE 13 27 12 27 138\nREMOVE 12 27 11 27 139\nREMOVE 11 27 11 26 140\nREMOVE 11 26 12 26 141\nREMOVE 12 26 12 25 142\nREMOVE 12 25 12 24 143\nREMOVE 12 24 11 24 144\nREMOVE 11 24 11 25 145\nREMOVE 11 25 10 25 146\nREMOVE 10 25 10 24 147\nREMOVE 10 24 9 24 148\nREMOVE 9 24 8 24 149\nREMOVE 8 24 8 25 150\nREMOVE 8 25 7 25 151\nREMOVE 7 25 7 24 152\nREMOVE 7 24 6 24 153\nREMOVE 6 24 5 24 154\nREMOVE 5 24 5 23 155\nREMOVE 5 23 4 23 156\nREMOVE 4 23 4 24 157\nREMOVE 4 24 4 25 158\nREMOVE 4 25 4 26 159\nREMOVE 4 26 3 26 160\nREMOVE 3 26 2 26 161\nREMOVE 2 26 2 25 162\nREMOVE 2 25 1 25 163\nREMOVE 1 25 0 25 164\nREMOVE 0 25 0 24 165\nREMOVE 0 24 1 24 166\nREMOVE 1 24 1 23 167\nREMOVE 1 23 0 23 168\nREMOVE 0 23 0 22 169\nREMOVE 0 22 1 22 170\nREMOVE 1 22 2 22 171\nREMOVE 2 22 2 21 172\nREMOVE 2 21 2 20 173\nREMOVE 2 20 2 19 174\nREMOVE 2 19 1 19 175\nREMOVE 1 19 0 19 176\nREMOVE 0 19 0 20 177\nREMOVE 0 20 1 20 178\nREMOVE 1 20 1 21 179\nREMOVE 1 21 0 21 180\nBACKTRACK 0 21\nBACKTRACK 1 21\nBACKTRACK 1 20\nBACKTRACK 0 20\nREMOVE 0 19 0 18 177\nREMOVE 0 18 0 17 178\nREMOVE 0 17 1 17 179\nREMOVE 1 17 1 16 180\nREMOVE 1 16 1 15 181\nREMOVE 1 15 0 15 182\nREMOVE 0 15 0 14 183\nREMOVE 0 14 0 13 184\nREMOVE 0 13 1 13 185\nREMOVE 1 13 1 14 186\nREMOVE 1 14 2 14 187\nREMOVE 2 14 2 13 188\nREMOVE 2 13 2 12 189\nREMOVE 2 12 3 12 190\nREMOVE 3 12 4 12 191\nREMOVE 4 12 4 11 192\nREMOVE 4 11 3 11 193\nREMOVE 3 11 3 10 194\nREMOVE 3 10 2 10 195\nREMOVE 2 10 1 10 196\nREMOVE 1 10 1 11 197\nREMOVE 1 11 2 11 198\nBACKTRACK 2 11\nREMOVE 1 11 0 11 198\nREMOVE 0 11 0 12 199\nREMOVE 0 12 1 12 200\nBACKTRACK 1 12\nBACKTRACK 0 12\nREMOVE 0 11 0 10 199\nREMOVE 0 10 0 9 200\nREMOVE 0 9 1 9 201\nREMOVE 1 9 2 9 202\nREMOVE 2 9 3 9 203\nREMOVE 3 9 3 8 204\nREMOVE 3 8 2 8 205\nREMOVE 2 8 1 8 206\nREMOVE 1 8 0 8 207\nREMOVE 0 8 0 7 208\nREMOVE 0 7 0 6 209\nREMOVE 0 6 0 5 210\nREMOVE 0 5 0 4 211\nBACKTRACK 0 4\nBACKTRACK 0 5\nBACKTRACK 0 6\nBACKTRACK 0 7\nBACKTRACK 0 8\nBACKTRACK 1 8\nBACKTRACK 2 8\nREMOVE 3 8 4 8 205\nREMOVE 4 8 4 9 206\nREMOVE 4 9 4 10 207\nREMOVE 4 10 5 10 208\nREMOVE 5 10 5 9 209\nREMOVE 5 9 6 9 210\nREMOVE 6 9 6 10 211\nREMOVE 6 10 7 10 212\nREMOVE 7 10 7 11 213\nREMOVE 7 11 7 12 214\nREMOVE 7 12 8 12 215\nREMOVE 8 12 8 11 216\nREMOVE 8 11 8 10 217\nREMOVE 8 10 9 10 218\nREMOVE 9 10 9 9 219\nREMOVE 9 9 10 9 220\nREMOVE 10 9 11 9 221\nREMOVE 11 9 12 9 222\nREMOVE 12 9 13 9 223\nREMOVE 13 9 13 10 224\nREMOVE 13 10 14 10 225\nREMOVE 14 10 15 10 226\nBACKTRACK 15 10\nREMOVE 14 10 14 9 226\nREMOVE 14 9 14 8 227\nREMOVE 14 8 13 8 228\nREMOVE 13 8 12 8 229\nREMOVE 12 8 11 8 230\nREMOVE 11 8 10 8 231\nREMOVE 10 8 9 8 232\nBACKTRACK 9 8\nBACKTRACK 10 8\nREMOVE 11 8 11 7 231\nBACKTRACK 11 7\nBACKTRACK 11 8\nBACKTRACK 12 8\nBACKTRACK 13 8\nBACKTRACK 14 8\nBACKTRACK 14 9\nBACKTRACK 14 10\nREMOVE 13 10 12 10 225\nREMOVE 12 10 11 10 226\nREMOVE 11 10 10 10 227\nREMOVE 10 10 10 11 228\nREMOVE 10 11 10 12 229\nREMOVE 10 12 11 12 230\nREMOVE 11 12 11 13 231\nREMOVE 11 13 10 13 232\nREMOVE 10 13 9 13 233\nREMOVE 9 13 9 12 234\nREMOVE 9 12 9 11 235\nBACKTRACK 9 11\nBACKTRACK 9 12\nREMOVE 9 13 9 14 234\nREMOVE 9 14 9 15 235\nREMOVE 9 15 10 15 236\nREMOVE 10 15 10 14 237\nREMOVE 10 14 11 14 238\nREMOVE 11 14 11 15 239\nREMOVE 11 15 12 15 240\nREMOVE 12 15 13 15 241\nREMOVE 13 15 13 16 242\nREMOVE 13 16 13 17 243\nREMOVE 13 17 13 18 244\nREMOVE 13 18 13 19 245\nREMOVE 13 19 13 20 246\nREMOVE 13 20 12 20 247\nREMOVE 12 20 12 21 248\nREMOVE 12 21 12 22 249\nREMOVE 12 22 12 23 250\nREMOVE 12 23 13 23 251\nREMOVE 13 23 14 23 252\nREMOVE 14 23 14 24 253\nREMOVE 14 24 13 24 254\nREMOVE 13 24 13 25 255\nBACKTRACK 13 25\nBACKTRACK 13 24\nREMOVE 14 24 15 24 254\nREMOVE 15 24 15 23 255\nREMOVE 15 23 15 22 256\nREMOVE 15 22 14 22 257\nREMOVE 14 22 13 22 258\nREMOVE 13 22 13 21 259\nREMOVE 13 21 14 21 260\nREMOVE 14 21 14 20 261\nBACKTRACK 14 20\nREMOVE 14 21 15 21 261\nREMOVE 15 21 16 21 262\nBACKTRACK 16 21\nBACKTRACK 15 21\nBACKTRACK 14 21\nBACKTRACK 13 21\nBACKTRACK 13 22\nBACKTRACK 14 22\nBACKTRACK 15 22\nBACKTRACK 15 23\nBACKTRACK 15 24\nBACKTRACK 14 24\nBACKTRACK 14 23\nBACKTRACK 13 23\nREMOVE 12 23 11 23 251\nREMOVE 11 23 11 22 252\nREMOVE 11 22 11 21 253\nREMOVE 11 21 10 21 254\nREMOVE 10 21 10 22 255\nREMOVE 10 22 9 22 256\nREMOVE 9 22 9 21 257\nREMOVE 9 21 8 21 258\nREMOVE 8 21 7 21 259\nREMOVE 7 21 7 22 260\nREMOVE 7 22 7 23 261\nREMOVE 7 23 6 23 262\nREMOVE 6 23 6 22 263\nREMOVE 6 22 6 21 264\nREMOVE 6 21 5 21 265\nREMOVE 5 21 5 22 266\nREMOVE 5 22 4 22 267\nREMOVE 4 22 3 22 268\nREMOVE 3 22 3 21 269\nREMOVE 3 21 4 21 270\nREMOVE 4 21 4 20 271\nREMOVE 4 20 5 20 272\nREMOVE 5 20 6 20 273\nREMOVE 6 20 6 19 274\nREMOVE 6 19 7 19 275\nREMOVE 7 19 7 20 276\nREMOVE 7 20 8 20 277\nREMOVE 8 20 8 19 278\nREMOVE 8 19 8 18 279\nREMOVE 8 18 8 17 280\nREMOVE 8 17 9 17 281\nREMOVE 9 17 9 16 282\nREMOVE 9 16 8 16 283\nREMOVE 8 16 7 16 284\nREMOVE 7 16 6 16 285\nREMOVE 6 16 5 16 286\nREMOVE 5 16 5 15 287\nREMOVE 5 15 5 14 288\nREMOVE 5 14 4 14 289\nREMOVE 4 14 4 13 290\nREMOVE 4 13 5 13 291\nREMOVE 5 13 5 12 292\nREMOVE 5 12 5 11 293\nREMOVE 5 11 6 11 294\nREMOVE 6 11 6 12 295\nREMOVE 6 12 6 13 296\nREMOVE 6 13 7 13 297\nREMOVE 7 13 8 13 298\nREMOVE 8 13 8 14 299\nREMOVE 8 14 8 15 300\nREMOVE 8 15 7 15 301\nREMOVE 7 15 7 14 302\nREMOVE 7 14 6 14 303\nREMOVE 6 14 6 15 304\nBACKTRACK 6 15\nBACKTRACK 6 14\nBACKTRACK 7 14\nBACKTRACK 7 15\nBACKTRACK 8 15\nBACKTRACK 8 14\nBACKTRACK 8 13\nBACKTRACK 7 13\nBACKTRACK 6 13\nBACKTRACK 6 12\nBACKTRACK 6 11\nBACKTRACK 5 11\nBACKTRACK 5 12\nBACKTRACK 5 13\nREMOVE 4 13 3 13 291\nREMOVE 3 13 3 14 292\nREMOVE 3 14 3 15 293\nREMOVE 3 15 3 16 294\nREMOVE 3 16 4 16 295\nREMOVE 4 16 4 17 296\nREMOVE 4 17 4 18 297\nREMOVE 4 18 5 18 298\nREMOVE 5 18 6 18 299\nREMOVE 6 18 6 17 300\nREMOVE 6 17 5 17 301\nBACKTRACK 5 17\nREMOVE 6 17 7 17 301\nREMOVE 7 17 7 18 302\nBACKTRACK 7 18\nBACKTRACK 7 17\nBACKTRACK 6 17\nBACKTRACK 6 18\nREMOVE 5 18 5 19 299\nREMOVE 5 19 4 19 300\nREMOVE 4 19 3 19 301\nREMOVE 3 19 3 20 302\nBACKTRACK 3 20\nREMOVE 3 19 3 18 302\nREMOVE 3 18 3 17 303\nREMOVE 3 17 2 17 304\nREMOVE 2 17 2 16 305\nREMOVE 2 16 2 15 306\nBACKTRACK 2 15\nBACKTRACK 2 16\nREMOVE 2 17 2 18 305\nREMOVE 2 18 1 18 306\nBACKTRACK 1 18\nBACKTRACK 2 18\nBACKTRACK 2 17\nBACKTRACK 3 17\nBACKTRACK 3 18\nBACKTRACK 3 19\nBACKTRACK 4 19\nBACKTRACK 5 19\nBACKTRACK 5 18\nBACKTRACK 4 18\nBACKTRACK 4 17\nREMOVE 4 16 4 15 296\nBACKTRACK 4 15\nBACKTRACK 4 16\nBACKTRACK 3 16\nBACKTRACK 3 15\nBACKTRACK 3 14\nBACKTRACK 3 13\nBACKTRACK 4 13\nBACKTRACK 4 14\nBACKTRACK 5 14\nBACKTRACK 5 15\nBACKTRACK 5 16\nBACKTRACK 6 16\nBACKTRACK 7 16\nBACKTRACK 8 16\nREMOVE 9 16 10 16 283\nREMOVE 10 16 10 17 284\nREMOVE 10 17 11 17 285\nREMOVE 11 17 11 16 286\nREMOVE 11 16 12 16 287\nREMOVE 12 16 12 17 288\nREMOVE 12 17 12 18 289\nREMOVE 12 18 12 19 290\nREMOVE 12 19 11 19 291\nREMOVE 11 19 10 19 292\nREMOVE 10 19 10 20 293\nREMOVE 10 20 11 20 294\nBACKTRACK 11 20\nREMOVE 10 20 9 20 294\nREMOVE 9 20 9 19 295\nREMOVE 9 19 9 18 296\nREMOVE 9 18 10 18 297\nREMOVE 10 18 11 18 298\nBACKTRACK 11 18\nBACKTRACK 10 18\nBACKTRACK 9 18\nBACKTRACK 9 19\nBACKTRACK 9 20\nBACKTRACK 10 20\nBACKTRACK 10 19\nBACKTRACK 11 19\nBACKTRACK 12 19\nBACKTRACK 12 18\nBACKTRACK 12 17\nBACKTRACK 12 16\nBACKTRACK 11 16\nBACKTRACK 11 17\nBACKTRACK 10 17\nBACKTRACK 10 16\nBACKTRACK 9 16\nBACKTRACK 9 17\nBACKTRACK 8 17\nBACKTRACK 8 18\nBACKTRACK 8 19\nBACKTRACK 8 20\nBACKTRACK 7 20\nBACKTRACK 7 19\nBACKTRACK 6 19\nBACKTRACK 6 20\nBACKTRACK 5 20\nBACKTRACK 4 20\nBACKTRACK 4 21\nBACKTRACK 3 21\nREMOVE 3 22 3 23 269\nREMOVE 3 23 3 24 270\nREMOVE 3 24 3 25 271\nBACKTRACK 3 25\nREMOVE 3 24 2 24 271\nREMOVE 2 24 2 23 272\nBACKTRACK 2 23\nBACKTRACK 2 24\nBACKTRACK 3 24\nBACKTRACK 3 23\nBACKTRACK 3 22\nBACKTRACK 4 22\nBACKTRACK 5 22\nBACKTRACK 5 21\nBACKTRACK 6 21\nBACKTRACK 6 22\nBACKTRACK 6 23\nREMOVE 7 23 8 23 262\nREMOVE 8 23 8 22 263\nBACKTRACK 8 22\nREMOVE 8 23 9 23 263\nREMOVE 9 23 10 23 264\nBACKTRACK 10 23\nBACKTRACK 9 23\nBACKTRACK 8 23\nBACKTRACK 7 23\nBACKTRACK 7 22\nBACKTRACK 7 21\nBACKTRACK 8 21\nBACKTRACK 9 21\nBACKTRACK 9 22\nBACKTRACK 10 22\nBACKTRACK 10 21\nBACKTRACK 11 21\nBACKTRACK 11 22\nBACKTRACK 11 23\nBACKTRACK 12 23\nBACKTRACK 12 22\nBACKTRACK 12 21\nBACKTRACK 12 20\nBACKTRACK 13 20\nBACKTRACK 13 19\nBACKTRACK 13 18\nREMOVE 13 17 14 17 244\nREMOVE 14 17 14 16 245\nREMOVE 14 16 14 15 246\nREMOVE 14 15 14 14 247\nREMOVE 14 14 13 14 248\nREMOVE 13 14 12 14 249\nBACKTRACK 12 14\nBACKTRACK 13 14\nREMOVE 14 14 15 14 248\nBACKTRACK 15 14\nBACKTRACK 14 14\nBACKTRACK 14 15\nBACKTRACK 14 16\nBACKTRACK 14 17\nBACKTRACK 13 17\nBACKTRACK 13 16\nBACKTRACK 13 15\nBACKTRACK 12 15\nBACKTRACK 11 15\nBACKTRACK 11 14\nBACKTRACK 10 14\nBACKTRACK 10 15\nBACKTRACK 9 15\nBACKTRACK 9 14\nBACKTRACK 9 13\nBACKTRACK 10 13\nBACKTRACK 11 13\nREMOVE 11 12 11 11 231\nREMOVE 11 11 12 11 232\nREMOVE 12 11 13 11 233\nBACKTRACK 13 11\nBACKTRACK 12 11\nBACKTRACK 11 11\nBACKTRACK 11 12\nBACKTRACK 10 12\nBACKTRACK 10 11\nBACKTRACK 10 10\nBACKTRACK 11 10\nBACKTRACK 12 10\nBACKTRACK 13 10\nBACKTRACK 13 9\nBACKTRACK 12 9\nBACKTRACK 11 9\nBACKTRACK 10 9\nBACKTRACK 9 9\nBACKTRACK 9 10\nBACKTRACK 8 10\nBACKTRACK 8 11\nBACKTRACK 8 12\nBACKTRACK 7 12\nBACKTRACK 7 11\nBACKTRACK 7 10\nBACKTRACK 6 10\nBACKTRACK 6 9\nBACKTRACK 5 9\nBACKTRACK 5 10\nBACKTRACK 4 10\nBACKTRACK 4 9\nBACKTRACK 4 8\nBACKTRACK 3 8\nBACKTRACK 3 9\nBACKTRACK 2 9\nBACKTRACK 1 9\nBACKTRACK 0 9\nBACKTRACK 0 10\nBACKTRACK 0 11\nBACKTRACK 1 11\nBACKTRACK 1 10\nBACKTRACK 2 10\nBACKTRACK 3 10\nBACKTRACK 3 11\nBACKTRACK 4 11\nBACKTRACK 4 12\nBACKTRACK 3 12\nBACKTRACK 2 12\nBACKTRACK 2 13\nBACKTRACK 2 14\nBACKTRACK 1 14\nBACKTRACK 1 13\nBACKTRACK 0 13\nBACKTRACK 0 14\nREMOVE 0 15 0 16 183\nBACKTRACK 0 16\nBACKTRACK 0 15\nBACKTRACK 1 15\nBACKTRACK 1 16\nBACKTRACK 1 17\nBACKTRACK 0 17\nBACKTRACK 0 18\nBACKTRACK 0 19\nBACKTRACK 1 19\nBACKTRACK 2 19\nBACKTRACK 2 20\nBACKTRACK 2 21\nBACKTRACK 2 22\nBACKTRACK 1 22\nBACKTRACK 0 22\nBACKTRACK 0 23\nBACKTRACK 1 23\nBACKTRACK 1 24\nBACKTRACK 0 24\nREMOVE 0 25 0 26 165\nREMOVE 0 26 0 27 166\nREMOVE 0 27 1 27 167\nREMOVE 1 27 2 27 168\nREMOVE 2 27 3 27 169\nREMOVE 3 27 4 27 170\nREMOVE 4 27 5 27 171\nREMOVE 5 27 6 27 172\nREMOVE 6 27 6 26 173\nREMOVE 6 26 6 25 174\nREMOVE 6 25 5 25 175\nREMOVE 5 25 5 26 176\nBACKTRACK 5 26\nBACKTRACK 5 25\nBACKTRACK 6 25\nREMOVE 6 26 7 26 174\nREMOVE 7 26 8 26 175\nREMOVE 8 26 8 27 176\nREMOVE 8 27 7 27 177\nBACKTRACK 7 27\nREMOVE 8 27 9 27 177\nREMOVE 9 27 9 26 178\nREMOVE 9 26 9 25 179\nBACKTRACK 9 25\nREMOVE 9 26 10 26 179\nREMOVE 10 26 10 27 180\nBACKTRACK 10 27\nBACKTRACK 10 26\nBACKTRACK 9 26\nBACKTRACK 9 27\nBACKTRACK 8 27\nBACKTRACK 8 26\nBACKTRACK 7 26\nBACKTRACK 6 26\nBACKTRACK 6 27\nBACKTRACK 5 27\nBACKTRACK 4 27\nBACKTRACK 3 27\nBACKTRACK 2 27\nREMOVE 1 27 1 26 168\nBACKTRACK 1 26\nBACKTRACK 1 27\nBACKTRACK 0 27\nBACKTRACK 0 26\nBACKTRACK 0 25\nBACKTRACK 1 25\nBACKTRACK 2 25\nBACKTRACK 2 26\nBACKTRACK 3 26\nBACKTRACK 4 26\nBACKTRACK 4 25\nBACKTRACK 4 24\nBACKTRACK 4 23\nBACKTRACK 5 23\nBACKTRACK 5 24\nBACKTRACK 6 24\nBACKTRACK 7 24\nBACKTRACK 7 25\nBACKTRACK 8 25\nBACKTRACK 8 24\nBACKTRACK 9 24\nBACKTRACK 10 24\nBACKTRACK 10 25\nBACKTRACK 11 25\nBACKTRACK 11 24\nBACKTRACK 12 24\nBACKTRACK 12 25\nBACKTRACK 12 26\nBACKTRACK 11 26\nBACKTRACK 11 27\nBACKTRACK 12 27\nBACKTRACK 13 27\nBACKTRACK 13 26\nBACKTRACK 14 26\nBACKTRACK 14 25\nBACKTRACK 15 25\nBACKTRACK 16 25\nBACKTRACK 16 26\nBACKTRACK 15 26\nBACKTRACK 15 27\nBACKTRACK 16 27\nBACKTRACK 17 27\nBACKTRACK 17 26\nBACKTRACK 17 25\nBACKTRACK 17 24\nBACKTRACK 16 24\nBACKTRACK 16 23\nBACKTRACK 16 22\nBACKTRACK 17 22\nBACKTRACK 17 21\nBACKTRACK 17 20\nBACKTRACK 17 19\nBACKTRACK 17 18\nBACKTRACK 17 17\nREMOVE 17 16 17 15 115\nREMOVE 17 15 17 14 116\nREMOVE 17 14 17 13 117\nBACKTRACK 17 13\nBACKTRACK 17 14\nBACKTRACK 17 15\nBACKTRACK 17 16\nBACKTRACK 16 16\nBACKTRACK 16 17\nBACKTRACK 16 18\nBACKTRACK 16 19\nBACKTRACK 16 20\nBACKTRACK 15 20\nBACKTRACK 15 19\nBACKTRACK 14 19\nBACKTRACK 14 18\nBACKTRACK 15 18\nBACKTRACK 15 17\nBACKTRACK 15 16\nBACKTRACK 15 15\nBACKTRACK 16 15\nBACKTRACK 16 14\nBACKTRACK 16 13\nBACKTRACK 15 13\nBACKTRACK 14 13\nBACKTRACK 13 13\nBACKTRACK 12 13\nBACKTRACK 12 12\nBACKTRACK 13 12\nBACKTRACK 14 12\nBACKTRACK 14 11\nREMOVE 15 11 16 11 90\nBACKTRACK 16 11\nBACKTRACK 15 11\nBACKTRACK 15 12\nBACKTRACK 16 12\nBACKTRACK 17 12\nBACKTRACK 17 11\nREMOVE 17 10 17 9 85\nREMOVE 17 9 17 8 86\nREMOVE 17 8 17 7 87\nREMOVE 17 7 17 6 88\nREMOVE 17 6 17 5 89\nREMOVE 17 5 17 4 90\nREMOVE 17 4 17 3 91\nREMOVE 17 3 17 2 92\nREMOVE 17 2 17 1 93\nREMOVE 17 1 17 0 94\nBACKTRACK 17 0\nBACKTRACK 17 1\nBACKTRACK 17 2\nBACKTRACK 17 3\nBACKTRACK 17 4\nBACKTRACK 17 5\nBACKTRACK 17 6\nBACKTRACK 17 7\nBACKTRACK 17 8\nBACKTRACK 17 9\nBACKTRACK 17 10\nBACKTRACK 16 10\nBACKTRACK 16 9\nBACKTRACK 15 9\nBACKTRACK 15 8\nBACKTRACK 16 8\nBACKTRACK 16 7\nBACKTRACK 16 6\nBACKTRACK 16 5\nBACKTRACK 16 4\nBACKTRACK 16 3\nBACKTRACK 16 2\nREMOVE 15 2 14 2 73\nREMOVE 14 2 13 2 74\nREMOVE 13 2 12 2 75\nBACKTRACK 12 2\nBACKTRACK 13 2\nBACKTRACK 14 2\nBACKTRACK 15 2\nBACKTRACK 15 1\nBACKTRACK 16 1\nBACKTRACK 16 0\nBACKTRACK 15 0\nBACKTRACK 14 0\nBACKTRACK 14 1\nBACKTRACK 13 1\nBACKTRACK 13 0\nBACKTRACK 12 0\nBACKTRACK 12 1\nBACKTRACK 11 1\nBACKTRACK 11 0\nBACKTRACK 10 0\nBACKTRACK 10 1\nBACKTRACK 9 1\nBACKTRACK 9 0\nBACKTRACK 8 0\nREMOVE 7 0 6 0 55\nREMOVE 6 0 5 0 56\nREMOVE 5 0 5 1 57\nREMOVE 5 1 5 2 58\nREMOVE 5 2 6 2 59\nREMOVE 6 2 7 2 60\nREMOVE 7 2 7 3 61\nREMOVE 7 3 6 3 62\nREMOVE 6 3 5 3 63\nREMOVE 5 3 5 4 64\nREMOVE 5 4 4 4 65\nREMOVE 4 4 4 3 66\nREMOVE 4 3 3 3 67\nREMOVE 3 3 3 4 68\nREMOVE 3 4 2 4 69\nREMOVE 2 4 2 3 70\nBACKTRACK 2 3\nREMOVE 2 4 2 5 70\nREMOVE 2 5 3 5 71\nREMOVE 3 5 3 6 72\nREMOVE 3 6 2 6 73\nBACKTRACK 2 6\nBACKTRACK 3 6\nREMOVE 3 5 4 5 72\nREMOVE 4 5 5 5 73\nREMOVE 5 5 6 5 74\nREMOVE 6 5 6 6 75\nREMOVE 6 6 7 6 76\nREMOVE 7 6 8 6 77\nREMOVE 8 6 8 5 78\nREMOVE 8 5 7 5 79\nREMOVE 7 5 7 4 80\nREMOVE 7 4 6 4 81\nBACKTRACK 6 4\nREMOVE 7 4 8 4 81\nREMOVE 8 4 8 3 82\nREMOVE 8 3 9 3 83\nREMOVE 9 3 10 3 84\nREMOVE 10 3 10 4 85\nREMOVE 10 4 10 5 86\nREMOVE 10 5 9 5 87\nREMOVE 9 5 9 4 88\nBACKTRACK 9 4\nREMOVE 9 5 9 6 88\nBACKTRACK 9 6\nBACKTRACK 9 5\nREMOVE 10 5 11 5 87\nREMOVE 11 5 11 4 88\nREMOVE 11 4 12 4 89\nREMOVE 12 4 12 5 90\nBACKTRACK 12 5\nREMOVE 12 4 13 4 90\nBACKTRACK 13 4\nBACKTRACK 12 4\nBACKTRACK 11 4\nBACKTRACK 11 5\nBACKTRACK 10 5\nBACKTRACK 10 4\nBACKTRACK 10 3\nBACKTRACK 9 3\nBACKTRACK 8 3\nBACKTRACK 8 4\nBACKTRACK 7 4\nBACKTRACK 7 5\nBACKTRACK 8 5\nBACKTRACK 8 6\nBACKTRACK 7 6\nBACKTRACK 6 6\nBACKTRACK 6 5\nBACKTRACK 5 5\nBACKTRACK 4 5\nBACKTRACK 3 5\nBACKTRACK 2 5\nBACKTRACK 2 4\nBACKTRACK 3 4\nREMOVE 3 3 3 2 68\nREMOVE 3 2 4 2 69\nREMOVE 4 2 4 1 70\nREMOVE 4 1 4 0 71\nREMOVE 4 0 3 0 72\nREMOVE 3 0 3 1 73\nBACKTRACK 3 1\nBACKTRACK 3 0\nBACKTRACK 4 0\nBACKTRACK 4 1\nBACKTRACK 4 2\nBACKTRACK 3 2\nBACKTRACK 3 3\nBACKTRACK 4 3\nBACKTRACK 4 4\nBACKTRACK 5 4\nBACKTRACK 5 3\nBACKTRACK 6 3\nBACKTRACK 7 3\nBACKTRACK 7 2\nREMOVE 6 2 6 1 60\nBACKTRACK 6 1\nBACKTRACK 6 2\nBACKTRACK 5 2\nBACKTRACK 5 1\nBACKTRACK 5 0\nBACKTRACK 6 0\nBACKTRACK 7 0\nBACKTRACK 7 1\nBACKTRACK 8 1\nBACKTRACK 8 2\nBACKTRACK 9 2\nBACKTRACK 10 2\nBACKTRACK 11 2\nBACKTRACK 11 3\nBACKTRACK 12 3\nBACKTRACK 13 3\nBACKTRACK 14 3\nBACKTRACK 14 4\nBACKTRACK 14 5\nBACKTRACK 13 5\nBACKTRACK 13 6\nBACKTRACK 14 6\nBACKTRACK 14 7\nBACKTRACK 13 7\nBACKTRACK 12 7\nBACKTRACK 12 6\nBACKTRACK 11 6\nBACKTRACK 10 6\nBACKTRACK 10 7\nBACKTRACK 9 7\nBACKTRACK 8 7\nBACKTRACK 8 8\nBACKTRACK 8 9\nBACKTRACK 7 9\nBACKTRACK 7 8\nBACKTRACK 7 7\nBACKTRACK 6 7\nBACKTRACK 6 8\nBACKTRACK 5 8\nBACKTRACK 5 7\nBACKTRACK 5 6\nBACKTRACK 4 6\nBACKTRACK 4 7\nBACKTRACK 3 7\nBACKTRACK 2 7\nBACKTRACK 1 7\nBACKTRACK 1 6\nBACKTRACK 1 5\nBACKTRACK 1 4\nBACKTRACK 1 3\nBACKTRACK 0 3\nBACKTRACK 0 2\nBACKTRACK 0 1\nBACKTRACK 1 1\nBACKTRACK 1 2\nBACKTRACK 2 2\nBACKTRACK 2 1\nBACKTRACK 2 0\nBACKTRACK 1 0\nBACKTRACK 0 0\nDONE 504 503\nBFS 0 0 0\nBFS 1 0 1\nBFS 2 0 2\nBFS 2 1 3\nBFS 2 2 4\nBFS 1 2 5\nBFS 1 1 6\nBFS 0 1 7\nBFS 0 2 8\nBFS 0 3 9\nBFS 1 3 10\nBFS 1 4 11\nBFS 1 5 12\nBFS 1 6 13\nBFS 1 7 14\nBFS 2 7 15\nBFS 3 7 16\nBFS 4 7 17\nBFS 4 6 18\nBFS 5 6 19\nBFS 5 7 20\nBFS 5 8 21\nBFS 6 8 22\nBFS 6 7 23\nBFS 7 7 24\nBFS 7 8 25\nBFS 7 9 26\nBFS 8 9 27\nBFS 8 8 28\nBFS 8 7 29\nBFS 9 7 30\nBFS 10 7 31\nBFS 10 6 32\nBFS 11 6 33\nBFS 12 6 34\nBFS 12 7 35\nBFS 13 7 36\nBFS 14 7 37\nBFS 14 6 38\nBFS 13 6 39\nBFS 13 5 40\nBFS 14 5 41\nBFS 14 4 42\nBFS 14 3 43\nBFS 13 3 44\nBFS 12 3 45\nBFS 11 3 46\nBFS 11 2 47\nBFS 10 2 48\nBFS 9 2 49\nBFS 8 2 50\nBFS 8 1 51\nBFS 7 1 52\nBFS 7 0 53\nBFS 6 0 54\nBFS 8 0 54\nBFS 5 0 55\nBFS 9 0 55\nBFS 5 1 56\nBFS 9 1 56\nBFS 5 2 57\nBFS 10 1 57\nBFS 6 2 58\nBFS 10 0 58\nBFS 7 2 59\nBFS 6 1 59\nBFS 11 0 59\nBFS 7 3 60\nBFS 11 1 60\nBFS 6 3 61\nBFS 12 1 61\nBFS 5 3 62\nBFS 12 0 62\nBFS 5 4 63\nBFS 13 0 63\nBFS 4 4 64\nBFS 13 1 64\nBFS 4 3 65\nBFS 14 1 65\nBFS 3 3 66\nBFS 14 0 66\nBFS 3 4 67\nBFS 3 2 67\nBFS 15 0 67\nBFS 2 4 68\nBFS 4 2 68\nBFS 16 0 68\nBFS 2 5 69\nBFS 2 3 69\nBFS 4 1 69\nBFS 16 1 69\nBFS 3 5 70\nBFS 4 0 70\nBFS 15 1 70\nBFS 4 5 71\nBFS 3 6 71\nBFS 3 0 71\nBFS 15 2 71\nBFS 5 5 72\nBFS 2 6 72\nBFS 3 1 72\nBFS 14 2 72\nBFS 16 2 72\nBFS 6 5 73\nBFS 13 2 73\nBFS 16 3 73\nBFS 6 6 74\nBFS 12 2 74\nBFS 16 4 74\nBFS 7 6 75\nBFS 16 5 75\nBFS 8 6 76\nBFS 16 6 76\nBFS 8 5 77\nBFS 16 7 77\nBFS 7 5 78\nBFS 16 8 78\nBFS 7 4 79\nBFS 15 8 79\nBFS 6 4 80\nBFS 8 4 80\nBFS 15 9 80\nBFS 15 7 80\nBFS 8 3 81\nBFS 16 9 81\nBFS 15 6 81\nBFS 9 3 82\nBFS 16 10 82\nBFS 15 5 82\nBFS 10 3 83\nBFS 17 10 83\nBFS 15 4 83\nBFS 10 4 84\nBFS 17 11 84\nBFS 17 9 84\nBFS 15 3 84\nBFS 10 5 85\nBFS 17 12 85\nBFS 17 8 85\nBFS 9 5 86\nBFS 11 5 86\nBFS 16 12 86\nBFS 17 7 86\nBFS 9 6 87\nBFS 9 4 87\nBFS 11 4 87\nBFS 15 12 87\nBFS 17 6 87\nBFS 12 4 88\nBFS 15 11 88\nBFS 17 5 88\nBFS 13 4 89\nBFS 12 5 89\nBFS 14 11 89\nBFS 16 11 89\nBFS 17 4 89\nBFS 14 12 90\nBFS 17 3 90\nBFS 13 12 91\nBFS 17 2 91\nBFS 12 12 92\nBFS 17 1 92\nBFS 12 13 93\nBFS 17 0 93\nBFS 13 13 94\nBFS 14 13 95\nBFS 15 13 96\nBFS 16 13 97\nBFS 16 14 98\nBFS 16 15 99\nBFS 15 15 100\nBFS 15 16 101\nBFS 15 17 102\nBFS 15 18 103\nBFS 14 18 104\nBFS 14 19 105\nBFS 15 19 106\nBFS 15 20 107\nBFS 16 20 108\nBFS 16 19 109\nBFS 16 18 110\nBFS 16 17 111\nBFS 16 16 112\nBFS 17 16 113\nBFS 17 17 114\nBFS 17 15 114\nBFS 17 18 115\nBFS 17 14 115\nBFS 17 19 116\nBFS 17 13 116\nBFS 17 20 117\nBFS 17 21 118\nBFS 17 22 119\nBFS 16 22 120\nBFS 16 23 121\nBFS 16 24 122\nBFS 17 24 123\nBFS 17 25 124\nBFS 17 23 124\nBFS 17 26 125\nBFS 17 27 126\nPATH_LEN 127 201\nPATH 0 0\nPATH 1 0\nPATH 2 0\nPATH 2 1\nPATH 2 2\nPATH 1 2\nPATH 1 1\nPATH 0 1\nPATH 0 2\nPATH 0 3\nPATH 1 3\nPATH 1 4\nPATH 1 5\nPATH 1 6\nPATH 1 7\nPATH 2 7\nPATH 3 7\nPATH 4 7\nPATH 4 6\nPATH 5 6\nPATH 5 7\nPATH 5 8\nPATH 6 8\nPATH 6 7\nPATH 7 7\nPATH 7 8\nPATH 7 9\nPATH 8 9\nPATH 8 8\nPATH 8 7\nPATH 9 7\nPATH 10 7\nPATH 10 6\nPATH 11 6\nPATH 12 6\nPATH 12 7\nPATH 13 7\nPATH 14 7\nPATH 14 6\nPATH 13 6\nPATH 13 5\nPATH 14 5\nPATH 14 4\nPATH 14 3\nPATH 13 3\nPATH 12 3\nPATH 11 3\nPATH 11 2\nPATH 10 2\nPATH 9 2\nPATH 8 2\nPATH 8 1\nPATH 7 1\nPATH 7 0\nPATH 8 0\nPATH 9 0\nPATH 9 1\nPATH 10 1\nPATH 10 0\nPATH 11 0\nPATH 11 1\nPATH 12 1\nPATH 12 0\nPATH 13 0\nPATH 13 1\nPATH 14 1\nPATH 14 0\nPATH 15 0\nPATH 16 0\nPATH 16 1\nPATH 15 1\nPATH 15 2\nPATH 16 2\nPATH 16 3\nPATH 16 4\nPATH 16 5\nPATH 16 6\nPATH 16 7\nPATH 16 8\nPATH 15 8\nPATH 15 9\nPATH 16 9\nPATH 16 10\nPATH 17 10\nPATH 17 11\nPATH 17 12\nPATH 16 12\nPATH 15 12\nPATH 15 11\nPATH 14 11\nPATH 14 12\nPATH 13 12\nPATH 12 12\nPATH 12 13\nPATH 13 13\nPATH 14 13\nPATH 15 13\nPATH 16 13\nPATH 16 14\nPATH 16 15\nPATH 15 15\nPATH 15 16\nPATH 15 17\nPATH 15 18\nPATH 14 18\nPATH 14 19\nPATH 15 19\nPATH 15 20\nPATH 16 20\nPATH 16 19\nPATH 16 18\nPATH 16 17\nPATH 16 16\nPATH 17 16\nPATH 17 17\nPATH 17 18\nPATH 17 19\nPATH 17 20\nPATH 17 21\nPATH 17 22\nPATH 16 22\nPATH 16 23\nPATH 16 24\nPATH 17 24\nPATH 17 25\nPATH 17 26\nPATH 17 27\nWALLS 18 28\nW 1 0 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 1 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 0 0\nW 1 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 0 0\nW 1 0 1 0\nW 1 0 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 1 0 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 0 0 1 0\nW 0 1 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 1 1 0 1\nW 0 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 1 1 0 1\nW 1 0 0 0\nW 1 0 1 0\nW 1 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 1 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 1 1 0 1\nW 1 1 0 0\nW 1 0 0 0\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 1 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 1 1 0\nW 1 0 0 1\nW 1 0 0 0\nW 0 1 1 0\nW 0 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 0 0\nW 1 1 1 0\nW 1 0 0 1\nW 1 0 0 0\nW 1 1 0 0\nW 0 1 0 0\nW 1 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 0 1 1 0\nW 0 0 0 1\nW 1 0 1 0\nW 1 1 0 1\nW 0 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 1 1\nW 0 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 1 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 1 0 1\nW 0 0 1 0\nW 0 0 1 1\nW 1 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 1 1 1 0\nW 0 0 1 1\nW 0 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 0 0 0\nW 0 1 1 0\nW 0 0 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 0 1 1 0\nW 0 0 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 0 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 1 1 0 1\nW 0 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 0 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 1 0 1\nW 1 0 0 0\nW 1 1 1 0\nW 0 0 1 1\nW 1 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 1 1 0 1\nW 1 1 0 0\nW 1 0 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 1 0 1\nW 1 0 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 0 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 0 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 1 1 0 1\nW 0 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 0 0\nW 0 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 1 1\nW 0 0 1 1\nW 0 1 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 1 1\nW 0 0 1 1\nW 0 0 0 1\nW 1 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 1 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 0 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 1 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 0 0 1 0\nW 0 1 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 1 1 0\nW 1 0 0 1\nW 0 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 1 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 0 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 1 0 1 0\nW 1 1 0 1\nW 0 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 0 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 0 0 1 0\nW 1 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 0 0\nW 1 0 1 0\nW 0 1 1 1\nW 0 0 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 0 1 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 1 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 1 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 1 1 0 1\nW 0 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nSTATS nodes=504 edges_in_graph=2016 tree_edges=503 backtracks=504"},{"label":"XLarge","rows":24,"cols":36,"seed":5005,"desc":"Expert","data":"START 0 0\nREMOVE 0 0 1 0 2\nREMOVE 1 0 2 0 3\nREMOVE 2 0 3 0 4\nREMOVE 3 0 4 0 5\nREMOVE 4 0 5 0 6\nREMOVE 5 0 5 1 7\nREMOVE 5 1 5 2 8\nREMOVE 5 2 6 2 9\nREMOVE 6 2 6 3 10\nREMOVE 6 3 7 3 11\nREMOVE 7 3 7 4 12\nREMOVE 7 4 8 4 13\nREMOVE 8 4 8 3 14\nREMOVE 8 3 8 2 15\nREMOVE 8 2 7 2 16\nREMOVE 7 2 7 1 17\nREMOVE 7 1 7 0 18\nREMOVE 7 0 8 0 19\nREMOVE 8 0 9 0 20\nREMOVE 9 0 10 0 21\nREMOVE 10 0 11 0 22\nREMOVE 11 0 11 1 23\nREMOVE 11 1 10 1 24\nREMOVE 10 1 9 1 25\nREMOVE 9 1 9 2 26\nREMOVE 9 2 9 3 27\nREMOVE 9 3 10 3 28\nREMOVE 10 3 10 2 29\nREMOVE 10 2 11 2 30\nREMOVE 11 2 11 3 31\nREMOVE 11 3 11 4 32\nREMOVE 11 4 11 5 33\nREMOVE 11 5 12 5 34\nREMOVE 12 5 13 5 35\nREMOVE 13 5 13 6 36\nREMOVE 13 6 14 6 37\nREMOVE 14 6 14 7 38\nREMOVE 14 7 15 7 39\nREMOVE 15 7 16 7 40\nREMOVE 16 7 16 8 41\nREMOVE 16 8 16 9 42\nREMOVE 16 9 16 10 43\nREMOVE 16 10 15 10 44\nREMOVE 15 10 15 11 45\nREMOVE 15 11 15 12 46\nREMOVE 15 12 14 12 47\nREMOVE 14 12 13 12 48\nREMOVE 13 12 13 13 49\nREMOVE 13 13 14 13 50\nREMOVE 14 13 15 13 51\nREMOVE 15 13 15 14 52\nREMOVE 15 14 16 14 53\nREMOVE 16 14 16 13 54\nREMOVE 16 13 16 12 55\nREMOVE 16 12 16 11 56\nREMOVE 16 11 17 11 57\nREMOVE 17 11 17 12 58\nREMOVE 17 12 17 13 59\nREMOVE 17 13 18 13 60\nREMOVE 18 13 18 12 61\nREMOVE 18 12 18 11 62\nREMOVE 18 11 19 11 63\nREMOVE 19 11 19 10 64\nREMOVE 19 10 20 10 65\nREMOVE 20 10 20 9 66\nREMOVE 20 9 19 9 67\nREMOVE 19 9 19 8 68\nREMOVE 19 8 20 8 69\nREMOVE 20 8 21 8 70\nREMOVE 21 8 21 9 71\nREMOVE 21 9 21 10 72\nREMOVE 21 10 21 11 73\nREMOVE 21 11 21 12 74\nREMOVE 21 12 20 12 75\nREMOVE 20 12 20 13 76\nREMOVE 20 13 20 14 77\nREMOVE 20 14 19 14 78\nREMOVE 19 14 19 15 79\nREMOVE 19 15 19 16 80\nREMOVE 19 16 20 16 81\nREMOVE 20 16 20 17 82\nREMOVE 20 17 21 17 83\nREMOVE 21 17 21 16 84\nREMOVE 21 16 21 15 85\nREMOVE 21 15 21 14 86\nREMOVE 21 14 21 13 87\nREMOVE 21 13 22 13 88\nREMOVE 22 13 22 14 89\nREMOVE 22 14 22 15 90\nREMOVE 22 15 23 15 91\nREMOVE 23 15 23 14 92\nREMOVE 23 14 23 13 93\nREMOVE 23 13 23 12 94\nREMOVE 23 12 22 12 95\nREMOVE 22 12 22 11 96\nREMOVE 22 11 22 10 97\nREMOVE 22 10 23 10 98\nREMOVE 23 10 23 9 99\nREMOVE 23 9 23 8 100\nREMOVE 23 8 22 8 101\nREMOVE 22 8 22 7 102\nREMOVE 22 7 23 7 103\nREMOVE 23 7 23 6 104\nREMOVE 23 6 22 6 105\nREMOVE 22 6 21 6 106\nREMOVE 21 6 21 5 107\nREMOVE 21 5 22 5 108\nREMOVE 22 5 23 5 109\nREMOVE 23 5 23 4 110\nREMOVE 23 4 22 4 111\nREMOVE 22 4 22 3 112\nREMOVE 22 3 22 2 113\nREMOVE 22 2 22 1 114\nREMOVE 22 1 22 0 115\nREMOVE 22 0 21 0 116\nREMOVE 21 0 20 0 117\nREMOVE 20 0 20 1 118\nREMOVE 20 1 19 1 119\nREMOVE 19 1 18 1 120\nREMOVE 18 1 18 0 121\nREMOVE 18 0 17 0 122\nREMOVE 17 0 17 1 123\nREMOVE 17 1 16 1 124\nREMOVE 16 1 16 2 125\nREMOVE 16 2 16 3 126\nREMOVE 16 3 17 3 127\nREMOVE 17 3 17 2 128\nREMOVE 17 2 18 2 129\nREMOVE 18 2 18 3 130\nREMOVE 18 3 19 3 131\nREMOVE 19 3 19 4 132\nREMOVE 19 4 19 5 133\nREMOVE 19 5 19 6 134\nREMOVE 19 6 20 6 135\nREMOVE 20 6 20 7 136\nREMOVE 20 7 19 7 137\nREMOVE 19 7 18 7 138\nREMOVE 18 7 18 6 139\nREMOVE 18 6 18 5 140\nREMOVE 18 5 18 4 141\nREMOVE 18 4 17 4 142\nREMOVE 17 4 17 5 143\nREMOVE 17 5 16 5 144\nREMOVE 16 5 16 4 145\nREMOVE 16 4 15 4 146\nREMOVE 15 4 14 4 147\nREMOVE 14 4 14 5 148\nREMOVE 14 5 15 5 149\nREMOVE 15 5 15 6 150\nREMOVE 15 6 16 6 151\nREMOVE 16 6 17 6 152\nREMOVE 17 6 17 7 153\nREMOVE 17 7 17 8 154\nREMOVE 17 8 18 8 155\nREMOVE 18 8 18 9 156\nREMOVE 18 9 18 10 157\nREMOVE 18 10 17 10 158\nREMOVE 17 10 17 9 159\nBACKTRACK 17 9\nBACKTRACK 17 10\nBACKTRACK 18 10\nBACKTRACK 18 9\nBACKTRACK 18 8\nBACKTRACK 17 8\nBACKTRACK 17 7\nBACKTRACK 17 6\nBACKTRACK 16 6\nBACKTRACK 15 6\nBACKTRACK 15 5\nBACKTRACK 14 5\nREMOVE 14 4 13 4 148\nREMOVE 13 4 12 4 149\nREMOVE 12 4 12 3 150\nREMOVE 12 3 12 2 151\nREMOVE 12 2 13 2 152\nREMOVE 13 2 14 2 153\nREMOVE 14 2 14 3 154\nREMOVE 14 3 15 3 155\nREMOVE 15 3 15 2 156\nREMOVE 15 2 15 1 157\nREMOVE 15 1 15 0 158\nREMOVE 15 0 16 0 159\nBACKTRACK 16 0\nREMOVE 15 0 14 0 159\nREMOVE 14 0 14 1 160\nREMOVE 14 1 13 1 161\nREMOVE 13 1 12 1 162\nREMOVE 12 1 12 0 163\nREMOVE 12 0 13 0 164\nBACKTRACK 13 0\nBACKTRACK 12 0\nBACKTRACK 12 1\nBACKTRACK 13 1\nBACKTRACK 14 1\nBACKTRACK 14 0\nBACKTRACK 15 0\nBACKTRACK 15 1\nBACKTRACK 15 2\nBACKTRACK 15 3\nREMOVE 14 3 13 3 155\nBACKTRACK 13 3\nBACKTRACK 14 3\nBACKTRACK 14 2\nBACKTRACK 13 2\nBACKTRACK 12 2\nBACKTRACK 12 3\nBACKTRACK 12 4\nBACKTRACK 13 4\nBACKTRACK 14 4\nBACKTRACK 15 4\nBACKTRACK 16 4\nBACKTRACK 16 5\nBACKTRACK 17 5\nBACKTRACK 17 4\nBACKTRACK 18 4\nBACKTRACK 18 5\nBACKTRACK 18 6\nBACKTRACK 18 7\nBACKTRACK 19 7\nREMOVE 20 7 21 7 137\nBACKTRACK 21 7\nBACKTRACK 20 7\nREMOVE 20 6 20 5 136\nREMOVE 20 5 20 4 137\nREMOVE 20 4 21 4 138\nREMOVE 21 4 21 3 139\nREMOVE 21 3 21 2 140\nREMOVE 21 2 20 2 141\nREMOVE 20 2 20 3 142\nBACKTRACK 20 3\nREMOVE 20 2 19 2 142\nBACKTRACK 19 2\nBACKTRACK 20 2\nREMOVE 21 2 21 1 141\nBACKTRACK 21 1\nBACKTRACK 21 2\nBACKTRACK 21 3\nBACKTRACK 21 4\nBACKTRACK 20 4\nBACKTRACK 20 5\nBACKTRACK 20 6\nBACKTRACK 19 6\nBACKTRACK 19 5\nBACKTRACK 19 4\nBACKTRACK 19 3\nBACKTRACK 18 3\nBACKTRACK 18 2\nBACKTRACK 17 2\nBACKTRACK 17 3\nBACKTRACK 16 3\nBACKTRACK 16 2\nBACKTRACK 16 1\nBACKTRACK 17 1\nBACKTRACK 17 0\nREMOVE 18 0 19 0 122\nBACKTRACK 19 0\nBACKTRACK 18 0\nBACKTRACK 18 1\nBACKTRACK 19 1\nBACKTRACK 20 1\nBACKTRACK 20 0\nBACKTRACK 21 0\nREMOVE 22 0 23 0 116\nREMOVE 23 0 23 1 117\nREMOVE 23 1 23 2 118\nREMOVE 23 2 23 3 119\nBACKTRACK 23 3\nBACKTRACK 23 2\nBACKTRACK 23 1\nBACKTRACK 23 0\nBACKTRACK 22 0\nBACKTRACK 22 1\nBACKTRACK 22 2\nBACKTRACK 22 3\nBACKTRACK 22 4\nBACKTRACK 23 4\nBACKTRACK 23 5\nBACKTRACK 22 5\nBACKTRACK 21 5\nBACKTRACK 21 6\nBACKTRACK 22 6\nBACKTRACK 23 6\nBACKTRACK 23 7\nBACKTRACK 22 7\nREMOVE 22 8 22 9 102\nBACKTRACK 22 9\nBACKTRACK 22 8\nBACKTRACK 23 8\nBACKTRACK 23 9\nREMOVE 23 10 23 11 99\nBACKTRACK 23 11\nBACKTRACK 23 10\nBACKTRACK 22 10\nBACKTRACK 22 11\nBACKTRACK 22 12\nBACKTRACK 23 12\nBACKTRACK 23 13\nBACKTRACK 23 14\nREMOVE 23 15 23 16 92\nREMOVE 23 16 23 17 93\nREMOVE 23 17 22 17 94\nREMOVE 22 17 22 18 95\nREMOVE 22 18 21 18 96\nREMOVE 21 18 20 18 97\nREMOVE 20 18 20 19 98\nREMOVE 20 19 19 19 99\nREMOVE 19 19 19 18 100\nREMOVE 19 18 18 18 101\nREMOVE 18 18 17 18 102\nREMOVE 17 18 17 19 103\nREMOVE 17 19 16 19 104\nREMOVE 16 19 15 19 105\nREMOVE 15 19 14 19 106\nREMOVE 14 19 14 20 107\nREMOVE 14 20 13 20 108\nREMOVE 13 20 13 21 109\nREMOVE 13 21 13 22 110\nREMOVE 13 22 13 23 111\nREMOVE 13 23 14 23 112\nREMOVE 14 23 14 22 113\nREMOVE 14 22 14 21 114\nREMOVE 14 21 15 21 115\nREMOVE 15 21 15 20 116\nREMOVE 15 20 16 20 117\nREMOVE 16 20 17 20 118\nREMOVE 17 20 17 21 119\nREMOVE 17 21 18 21 120\nREMOVE 18 21 18 22 121\nREMOVE 18 22 17 22 122\nREMOVE 17 22 16 22 123\nREMOVE 16 22 16 23 124\nREMOVE 16 23 16 24 125\nREMOVE 16 24 16 25 126\nREMOVE 16 25 17 25 127\nREMOVE 17 25 17 24 128\nREMOVE 17 24 18 24 129\nREMOVE 18 24 18 23 130\nREMOVE 18 23 19 23 131\nREMOVE 19 23 19 24 132\nREMOVE 19 24 20 24 133\nREMOVE 20 24 21 24 134\nREMOVE 21 24 21 25 135\nREMOVE 21 25 22 25 136\nREMOVE 22 25 22 26 137\nREMOVE 22 26 22 27 138\nREMOVE 22 27 21 27 139\nREMOVE 21 27 21 26 140\nREMOVE 21 26 20 26 141\nREMOVE 20 26 20 25 142\nREMOVE 20 25 19 25 143\nREMOVE 19 25 19 26 144\nREMOVE 19 26 18 26 145\nREMOVE 18 26 17 26 146\nREMOVE 17 26 16 26 147\nREMOVE 16 26 16 27 148\nREMOVE 16 27 16 28 149\nREMOVE 16 28 15 28 150\nREMOVE 15 28 14 28 151\nREMOVE 14 28 13 28 152\nREMOVE 13 28 12 28 153\nREMOVE 12 28 12 27 154\nREMOVE 12 27 13 27 155\nREMOVE 13 27 14 27 156\nREMOVE 14 27 14 26 157\nREMOVE 14 26 13 26 158\nREMOVE 13 26 12 26 159\nREMOVE 12 26 11 26 160\nREMOVE 11 26 11 25 161\nREMOVE 11 25 11 24 162\nREMOVE 11 24 11 23 163\nREMOVE 11 23 10 23 164\nREMOVE 10 23 10 22 165\nREMOVE 10 22 10 21 166\nREMOVE 10 21 9 21 167\nREMOVE 9 21 8 21 168\nREMOVE 8 21 8 20 169\nREMOVE 8 20 7 20 170\nREMOVE 7 20 7 19 171\nREMOVE 7 19 6 19 172\nREMOVE 6 19 5 19 173\nREMOVE 5 19 4 19 174\nREMOVE 4 19 3 19 175\nREMOVE 3 19 3 18 176\nREMOVE 3 18 2 18 177\nREMOVE 2 18 2 17 178\nREMOVE 2 17 3 17 179\nREMOVE 3 17 3 16 180\nREMOVE 3 16 2 16 181\nREMOVE 2 16 1 16 182\nREMOVE 1 16 0 16 183\nREMOVE 0 16 0 15 184\nREMOVE 0 15 1 15 185\nREMOVE 1 15 1 14 186\nREMOVE 1 14 1 13 187\nREMOVE 1 13 1 12 188\nREMOVE 1 12 0 12 189\nREMOVE 0 12 0 13 190\nREMOVE 0 13 0 14 191\nBACKTRACK 0 14\nBACKTRACK 0 13\nREMOVE 0 12 0 11 190\nREMOVE 0 11 1 11 191\nREMOVE 1 11 1 10 192\nREMOVE 1 10 0 10 193\nREMOVE 0 10 0 9 194\nREMOVE 0 9 0 8 195\nREMOVE 0 8 0 7 196\nREMOVE 0 7 1 7 197\nREMOVE 1 7 1 8 198\nREMOVE 1 8 1 9 199\nREMOVE 1 9 2 9 200\nREMOVE 2 9 2 8 201\nREMOVE 2 8 3 8 202\nREMOVE 3 8 3 9 203\nREMOVE 3 9 4 9 204\nREMOVE 4 9 4 8 205\nREMOVE 4 8 5 8 206\nREMOVE 5 8 5 7 207\nREMOVE 5 7 5 6 208\nREMOVE 5 6 4 6 209\nREMOVE 4 6 4 5 210\nREMOVE 4 5 4 4 211\nREMOVE 4 4 5 4 212\nREMOVE 5 4 5 3 213\nREMOVE 5 3 4 3 214\nREMOVE 4 3 3 3 215\nREMOVE 3 3 3 2 216\nREMOVE 3 2 4 2 217\nREMOVE 4 2 4 1 218\nREMOVE 4 1 3 1 219\nREMOVE 3 1 2 1 220\nREMOVE 2 1 1 1 221\nREMOVE 1 1 1 2 222\nREMOVE 1 2 0 2 223\nREMOVE 0 2 0 1 224\nBACKTRACK 0 1\nREMOVE 0 2 0 3 224\nREMOVE 0 3 0 4 225\nREMOVE 0 4 1 4 226\nREMOVE 1 4 1 3 227\nREMOVE 1 3 2 3 228\nREMOVE 2 3 2 4 229\nREMOVE 2 4 2 5 230\nREMOVE 2 5 2 6 231\nREMOVE 2 6 3 6 232\nREMOVE 3 6 3 7 233\nREMOVE 3 7 4 7 234\nBACKTRACK 4 7\nREMOVE 3 7 2 7 234\nBACKTRACK 2 7\nBACKTRACK 3 7\nREMOVE 3 6 3 5 233\nREMOVE 3 5 3 4 234\nBACKTRACK 3 4\nBACKTRACK 3 5\nBACKTRACK 3 6\nREMOVE 2 6 1 6 232\nREMOVE 1 6 0 6 233\nREMOVE 0 6 0 5 234\nREMOVE 0 5 1 5 235\nBACKTRACK 1 5\nBACKTRACK 0 5\nBACKTRACK 0 6\nBACKTRACK 1 6\nBACKTRACK 2 6\nBACKTRACK 2 5\nBACKTRACK 2 4\nREMOVE 2 3 2 2 229\nBACKTRACK 2 2\nBACKTRACK 2 3\nBACKTRACK 1 3\nBACKTRACK 1 4\nBACKTRACK 0 4\nBACKTRACK 0 3\nBACKTRACK 0 2\nBACKTRACK 1 2\nBACKTRACK 1 1\nBACKTRACK 2 1\nBACKTRACK 3 1\nBACKTRACK 4 1\nBACKTRACK 4 2\nBACKTRACK 3 2\nBACKTRACK 3 3\nBACKTRACK 4 3\nBACKTRACK 5 3\nREMOVE 5 4 5 5 213\nREMOVE 5 5 6 5 214\nREMOVE 6 5 6 4 215\nBACKTRACK 6 4\nREMOVE 6 5 7 5 215\nREMOVE 7 5 8 5 216\nREMOVE 8 5 8 6 217\nREMOVE 8 6 7 6 218\nREMOVE 7 6 7 7 219\nREMOVE 7 7 8 7 220\nREMOVE 8 7 8 8 221\nREMOVE 8 8 8 9 222\nREMOVE 8 9 8 10 223\nREMOVE 8 10 9 10 224\nREMOVE 9 10 9 11 225\nREMOVE 9 11 8 11 226\nREMOVE 8 11 8 12 227\nREMOVE 8 12 8 13 228\nREMOVE 8 13 7 13 229\nREMOVE 7 13 6 13 230\nREMOVE 6 13 6 14 231\nREMOVE 6 14 6 15 232\nREMOVE 6 15 7 15 233\nREMOVE 7 15 7 14 234\nREMOVE 7 14 8 14 235\nREMOVE 8 14 9 14 236\nREMOVE 9 14 10 14 237\nREMOVE 10 14 10 15 238\nREMOVE 10 15 11 15 239\nREMOVE 11 15 11 14 240\nREMOVE 11 14 12 14 241\nREMOVE 12 14 13 14 242\nREMOVE 13 14 13 15 243\nREMOVE 13 15 14 15 244\nREMOVE 14 15 14 14 245\nBACKTRACK 14 14\nREMOVE 14 15 15 15 245\nREMOVE 15 15 16 15 246\nREMOVE 16 15 17 15 247\nREMOVE 17 15 18 15 248\nREMOVE 18 15 18 16 249\nREMOVE 18 16 18 17 250\nREMOVE 18 17 19 17 251\nBACKTRACK 19 17\nREMOVE 18 17 17 17 251\nREMOVE 17 17 16 17 252\nREMOVE 16 17 16 16 253\nREMOVE 16 16 17 16 254\nBACKTRACK 17 16\nREMOVE 16 16 15 16 254\nREMOVE 15 16 15 17 255\nREMOVE 15 17 14 17 256\nREMOVE 14 17 13 17 257\nREMOVE 13 17 12 17 258\nREMOVE 12 17 12 16 259\nREMOVE 12 16 11 16 260\nREMOVE 11 16 10 16 261\nREMOVE 10 16 9 16 262\nREMOVE 9 16 9 17 263\nREMOVE 9 17 8 17 264\nREMOVE 8 17 8 18 265\nREMOVE 8 18 8 19 266\nREMOVE 8 19 9 19 267\nREMOVE 9 19 9 20 268\nREMOVE 9 20 10 20 269\nREMOVE 10 20 10 19 270\nREMOVE 10 19 11 19 271\nREMOVE 11 19 11 18 272\nREMOVE 11 18 11 17 273\nREMOVE 11 17 10 17 274\nREMOVE 10 17 10 18 275\nREMOVE 10 18 9 18 276\nBACKTRACK 9 18\nBACKTRACK 10 18\nBACKTRACK 10 17\nBACKTRACK 11 17\nREMOVE 11 18 12 18 273\nREMOVE 12 18 13 18 274\nREMOVE 13 18 13 19 275\nREMOVE 13 19 12 19 276\nREMOVE 12 19 12 20 277\nREMOVE 12 20 11 20 278\nREMOVE 11 20 11 21 279\nREMOVE 11 21 11 22 280\nREMOVE 11 22 12 22 281\nREMOVE 12 22 12 23 282\nREMOVE 12 23 12 24 283\nREMOVE 12 24 13 24 284\nREMOVE 13 24 14 24 285\nREMOVE 14 24 15 24 286\nREMOVE 15 24 15 23 287\nREMOVE 15 23 15 22 288\nBACKTRACK 15 22\nBACKTRACK 15 23\nREMOVE 15 24 15 25 287\nREMOVE 15 25 15 26 288\nREMOVE 15 26 15 27 289\nBACKTRACK 15 27\nBACKTRACK 15 26\nREMOVE 15 25 14 25 288\nREMOVE 14 25 13 25 289\nREMOVE 13 25 12 25 290\nBACKTRACK 12 25\nBACKTRACK 13 25\nBACKTRACK 14 25\nBACKTRACK 15 25\nBACKTRACK 15 24\nBACKTRACK 14 24\nBACKTRACK 13 24\nBACKTRACK 12 24\nBACKTRACK 12 23\nREMOVE 12 22 12 21 282\nBACKTRACK 12 21\nBACKTRACK 12 22\nBACKTRACK 11 22\nBACKTRACK 11 21\nBACKTRACK 11 20\nBACKTRACK 12 20\nBACKTRACK 12 19\nBACKTRACK 13 19\nREMOVE 13 18 14 18 275\nREMOVE 14 18 15 18 276\nREMOVE 15 18 16 18 277\nBACKTRACK 16 18\nBACKTRACK 15 18\nBACKTRACK 14 18\nBACKTRACK 13 18\nBACKTRACK 12 18\nBACKTRACK 11 18\nBACKTRACK 11 19\nBACKTRACK 10 19\nBACKTRACK 10 20\nBACKTRACK 9 20\nBACKTRACK 9 19\nBACKTRACK 8 19\nREMOVE 8 18 7 18 266\nREMOVE 7 18 6 18 267\nREMOVE 6 18 6 17 268\nREMOVE 6 17 5 17 269\nREMOVE 5 17 4 17 270\nREMOVE 4 17 4 16 271\nREMOVE 4 16 5 16 272\nREMOVE 5 16 6 16 273\nREMOVE 6 16 7 16 274\nREMOVE 7 16 8 16 275\nREMOVE 8 16 8 15 276\nREMOVE 8 15 9 15 277\nBACKTRACK 9 15\nBACKTRACK 8 15\nBACKTRACK 8 16\nREMOVE 7 16 7 17 275\nBACKTRACK 7 17\nBACKTRACK 7 16\nBACKTRACK 6 16\nREMOVE 5 16 5 15 273\nREMOVE 5 15 4 15 274\nREMOVE 4 15 3 15 275\nREMOVE 3 15 2 15 276\nREMOVE 2 15 2 14 277\nREMOVE 2 14 2 13 278\nREMOVE 2 13 3 13 279\nREMOVE 3 13 3 14 280\nREMOVE 3 14 4 14 281\nREMOVE 4 14 5 14 282\nREMOVE 5 14 5 13 283\nREMOVE 5 13 5 12 284\nREMOVE 5 12 5 11 285\nREMOVE 5 11 5 10 286\nREMOVE 5 10 5 9 287\nREMOVE 5 9 6 9 288\nREMOVE 6 9 6 8 289\nREMOVE 6 8 6 7 290\nREMOVE 6 7 6 6 291\nBACKTRACK 6 6\nBACKTRACK 6 7\nREMOVE 6 8 7 8 290\nREMOVE 7 8 7 9 291\nREMOVE 7 9 7 10 292\nREMOVE 7 10 7 11 293\nREMOVE 7 11 7 12 294\nREMOVE 7 12 6 12 295\nREMOVE 6 12 6 11 296\nREMOVE 6 11 6 10 297\nBACKTRACK 6 10\nBACKTRACK 6 11\nBACKTRACK 6 12\nBACKTRACK 7 12\nBACKTRACK 7 11\nBACKTRACK 7 10\nBACKTRACK 7 9\nBACKTRACK 7 8\nBACKTRACK 6 8\nBACKTRACK 6 9\nBACKTRACK 5 9\nREMOVE 5 10 4 10 287\nREMOVE 4 10 4 11 288\nREMOVE 4 11 4 12 289\nREMOVE 4 12 4 13 290\nBACKTRACK 4 13\nREMOVE 4 12 3 12 290\nREMOVE 3 12 3 11 291\nREMOVE 3 11 2 11 292\nREMOVE 2 11 2 12 293\nBACKTRACK 2 12\nREMOVE 2 11 2 10 293\nREMOVE 2 10 3 10 294\nBACKTRACK 3 10\nBACKTRACK 2 10\nBACKTRACK 2 11\nBACKTRACK 3 11\nBACKTRACK 3 12\nBACKTRACK 4 12\nBACKTRACK 4 11\nBACKTRACK 4 10\nBACKTRACK 5 10\nBACKTRACK 5 11\nBACKTRACK 5 12\nBACKTRACK 5 13\nBACKTRACK 5 14\nBACKTRACK 4 14\nBACKTRACK 3 14\nBACKTRACK 3 13\nBACKTRACK 2 13\nBACKTRACK 2 14\nBACKTRACK 2 15\nBACKTRACK 3 15\nBACKTRACK 4 15\nBACKTRACK 5 15\nBACKTRACK 5 16\nBACKTRACK 4 16\nREMOVE 4 17 4 18 271\nREMOVE 4 18 5 18 272\nBACKTRACK 5 18\nBACKTRACK 4 18\nBACKTRACK 4 17\nBACKTRACK 5 17\nBACKTRACK 6 17\nBACKTRACK 6 18\nBACKTRACK 7 18\nBACKTRACK 8 18\nBACKTRACK 8 17\nBACKTRACK 9 17\nBACKTRACK 9 16\nBACKTRACK 10 16\nBACKTRACK 11 16\nREMOVE 12 16 13 16 260\nREMOVE 13 16 14 16 261\nBACKTRACK 14 16\nBACKTRACK 13 16\nREMOVE 12 16 12 15 260\nBACKTRACK 12 15\nBACKTRACK 12 16\nBACKTRACK 12 17\nBACKTRACK 13 17\nBACKTRACK 14 17\nBACKTRACK 15 17\nBACKTRACK 15 16\nBACKTRACK 16 16\nBACKTRACK 16 17\nBACKTRACK 17 17\nBACKTRACK 18 17\nBACKTRACK 18 16\nREMOVE 18 15 18 14 249\nREMOVE 18 14 17 14 250\nBACKTRACK 17 14\nBACKTRACK 18 14\nBACKTRACK 18 15\nBACKTRACK 17 15\nBACKTRACK 16 15\nBACKTRACK 15 15\nBACKTRACK 14 15\nBACKTRACK 13 15\nBACKTRACK 13 14\nREMOVE 12 14 12 13 242\nREMOVE 12 13 12 12 243\nREMOVE 12 12 12 11 244\nREMOVE 12 11 11 11 245\nREMOVE 11 11 11 10 246\nREMOVE 11 10 11 9 247\nREMOVE 11 9 12 9 248\nREMOVE 12 9 12 8 249\nREMOVE 12 8 13 8 250\nREMOVE 13 8 13 9 251\nREMOVE 13 9 13 10 252\nREMOVE 13 10 14 10 253\nREMOVE 14 10 14 9 254\nREMOVE 14 9 14 8 255\nREMOVE 14 8 15 8 256\nREMOVE 15 8 15 9 257\nBACKTRACK 15 9\nBACKTRACK 15 8\nBACKTRACK 14 8\nBACKTRACK 14 9\nREMOVE 14 10 14 11 254\nREMOVE 14 11 13 11 255\nBACKTRACK 13 11\nBACKTRACK 14 11\nBACKTRACK 14 10\nREMOVE 13 10 12 10 253\nBACKTRACK 12 10\nBACKTRACK 13 10\nBACKTRACK 13 9\nREMOVE 13 8 13 7 251\nREMOVE 13 7 12 7 252\nREMOVE 12 7 11 7 253\nREMOVE 11 7 11 8 254\nREMOVE 11 8 10 8 255\nREMOVE 10 8 10 7 256\nREMOVE 10 7 10 6 257\nREMOVE 10 6 11 6 258\nREMOVE 11 6 12 6 259\nBACKTRACK 12 6\nBACKTRACK 11 6\nREMOVE 10 6 10 5 258\nREMOVE 10 5 10 4 259\nREMOVE 10 4 9 4 260\nREMOVE 9 4 9 5 261\nREMOVE 9 5 9 6 262\nREMOVE 9 6 9 7 263\nREMOVE 9 7 9 8 264\nREMOVE 9 8 9 9 265\nREMOVE 9 9 10 9 266\nREMOVE 10 9 10 10 267\nREMOVE 10 10 10 11 268\nREMOVE 10 11 10 12 269\nREMOVE 10 12 11 12 270\nREMOVE 11 12 11 13 271\nREMOVE 11 13 10 13 272\nREMOVE 10 13 9 13 273\nREMOVE 9 13 9 12 274\nBACKTRACK 9 12\nBACKTRACK 9 13\nBACKTRACK 10 13\nBACKTRACK 11 13\nBACKTRACK 11 12\nBACKTRACK 10 12\nBACKTRACK 10 11\nBACKTRACK 10 10\nBACKTRACK 10 9\nBACKTRACK 9 9\nBACKTRACK 9 8\nBACKTRACK 9 7\nBACKTRACK 9 6\nBACKTRACK 9 5\nBACKTRACK 9 4\nBACKTRACK 10 4\nBACKTRACK 10 5\nBACKTRACK 10 6\nBACKTRACK 10 7\nBACKTRACK 10 8\nBACKTRACK 11 8\nBACKTRACK 11 7\nBACKTRACK 12 7\nBACKTRACK 13 7\nBACKTRACK 13 8\nBACKTRACK 12 8\nBACKTRACK 12 9\nBACKTRACK 11 9\nBACKTRACK 11 10\nBACKTRACK 11 11\nBACKTRACK 12 11\nBACKTRACK 12 12\nBACKTRACK 12 13\nBACKTRACK 12 14\nBACKTRACK 11 14\nBACKTRACK 11 15\nBACKTRACK 10 15\nBACKTRACK 10 14\nBACKTRACK 9 14\nBACKTRACK 8 14\nBACKTRACK 7 14\nBACKTRACK 7 15\nBACKTRACK 6 15\nBACKTRACK 6 14\nBACKTRACK 6 13\nBACKTRACK 7 13\nBACKTRACK 8 13\nBACKTRACK 8 12\nBACKTRACK 8 11\nBACKTRACK 9 11\nBACKTRACK 9 10\nBACKTRACK 8 10\nBACKTRACK 8 9\nBACKTRACK 8 8\nBACKTRACK 8 7\nBACKTRACK 7 7\nBACKTRACK 7 6\nBACKTRACK 8 6\nBACKTRACK 8 5\nBACKTRACK 7 5\nBACKTRACK 6 5\nBACKTRACK 5 5\nBACKTRACK 5 4\nBACKTRACK 4 4\nBACKTRACK 4 5\nBACKTRACK 4 6\nBACKTRACK 5 6\nBACKTRACK 5 7\nBACKTRACK 5 8\nBACKTRACK 4 8\nBACKTRACK 4 9\nBACKTRACK 3 9\nBACKTRACK 3 8\nBACKTRACK 2 8\nBACKTRACK 2 9\nBACKTRACK 1 9\nBACKTRACK 1 8\nBACKTRACK 1 7\nBACKTRACK 0 7\nBACKTRACK 0 8\nBACKTRACK 0 9\nBACKTRACK 0 10\nBACKTRACK 1 10\nBACKTRACK 1 11\nBACKTRACK 0 11\nBACKTRACK 0 12\nBACKTRACK 1 12\nBACKTRACK 1 13\nBACKTRACK 1 14\nBACKTRACK 1 15\nBACKTRACK 0 15\nREMOVE 0 16 0 17 184\nREMOVE 0 17 1 17 185\nREMOVE 1 17 1 18 186\nREMOVE 1 18 1 19 187\nREMOVE 1 19 0 19 188\nREMOVE 0 19 0 20 189\nREMOVE 0 20 0 21 190\nREMOVE 0 21 0 22 191\nREMOVE 0 22 0 23 192\nREMOVE 0 23 1 23 193\nREMOVE 1 23 1 24 194\nREMOVE 1 24 2 24 195\nREMOVE 2 24 3 24 196\nREMOVE 3 24 3 25 197\nREMOVE 3 25 3 26 198\nREMOVE 3 26 4 26 199\nREMOVE 4 26 4 25 200\nREMOVE 4 25 5 25 201\nREMOVE 5 25 6 25 202\nREMOVE 6 25 7 25 203\nREMOVE 7 25 8 25 204\nREMOVE 8 25 9 25 205\nREMOVE 9 25 10 25 206\nREMOVE 10 25 10 24 207\nREMOVE 10 24 9 24 208\nREMOVE 9 24 8 24 209\nREMOVE 8 24 7 24 210\nREMOVE 7 24 7 23 211\nREMOVE 7 23 7 22 212\nREMOVE 7 22 7 21 213\nREMOVE 7 21 6 21 214\nREMOVE 6 21 5 21 215\nREMOVE 5 21 5 20 216\nREMOVE 5 20 4 20 217\nREMOVE 4 20 4 21 218\nREMOVE 4 21 4 22 219\nREMOVE 4 22 4 23 220\nREMOVE 4 23 3 23 221\nREMOVE 3 23 3 22 222\nREMOVE 3 22 3 21 223\nREMOVE 3 21 2 21 224\nREMOVE 2 21 2 20 225\nREMOVE 2 20 3 20 226\nBACKTRACK 3 20\nREMOVE 2 20 2 19 226\nBACKTRACK 2 19\nREMOVE 2 20 1 20 226\nREMOVE 1 20 1 21 227\nREMOVE 1 21 1 22 228\nREMOVE 1 22 2 22 229\nREMOVE 2 22 2 23 230\nBACKTRACK 2 23\nBACKTRACK 2 22\nBACKTRACK 1 22\nBACKTRACK 1 21\nBACKTRACK 1 20\nBACKTRACK 2 20\nBACKTRACK 2 21\nBACKTRACK 3 21\nBACKTRACK 3 22\nBACKTRACK 3 23\nREMOVE 4 23 5 23 221\nREMOVE 5 23 5 22 222\nREMOVE 5 22 6 22 223\nREMOVE 6 22 6 23 224\nREMOVE 6 23 6 24 225\nREMOVE 6 24 5 24 226\nREMOVE 5 24 4 24 227\nBACKTRACK 4 24\nBACKTRACK 5 24\nBACKTRACK 6 24\nBACKTRACK 6 23\nBACKTRACK 6 22\nBACKTRACK 5 22\nBACKTRACK 5 23\nBACKTRACK 4 23\nBACKTRACK 4 22\nBACKTRACK 4 21\nBACKTRACK 4 20\nREMOVE 5 20 6 20 217\nBACKTRACK 6 20\nBACKTRACK 5 20\nBACKTRACK 5 21\nBACKTRACK 6 21\nBACKTRACK 7 21\nREMOVE 7 22 8 22 213\nREMOVE 8 22 8 23 214\nREMOVE 8 23 9 23 215\nREMOVE 9 23 9 22 216\nBACKTRACK 9 22\nBACKTRACK 9 23\nBACKTRACK 8 23\nBACKTRACK 8 22\nBACKTRACK 7 22\nBACKTRACK 7 23\nBACKTRACK 7 24\nBACKTRACK 8 24\nBACKTRACK 9 24\nBACKTRACK 10 24\nREMOVE 10 25 10 26 207\nREMOVE 10 26 10 27 208\nREMOVE 10 27 11 27 209\nREMOVE 11 27 11 28 210\nREMOVE 11 28 11 29 211\nREMOVE 11 29 12 29 212\nREMOVE 12 29 12 30 213\nREMOVE 12 30 13 30 214\nREMOVE 13 30 13 29 215\nREMOVE 13 29 14 29 216\nREMOVE 14 29 15 29 217\nREMOVE 15 29 16 29 218\nREMOVE 16 29 16 30 219\nREMOVE 16 30 16 31 220\nREMOVE 16 31 17 31 221\nREMOVE 17 31 17 32 222\nREMOVE 17 32 16 32 223\nREMOVE 16 32 15 32 224\nREMOVE 15 32 14 32 225\nREMOVE 14 32 14 31 226\nREMOVE 14 31 14 30 227\nREMOVE 14 30 15 30 228\nREMOVE 15 30 15 31 229\nBACKTRACK 15 31\nBACKTRACK 15 30\nBACKTRACK 14 30\nREMOVE 14 31 13 31 227\nREMOVE 13 31 13 32 228\nREMOVE 13 32 13 33 229\nREMOVE 13 33 14 33 230\nREMOVE 14 33 14 34 231\nREMOVE 14 34 14 35 232\nREMOVE 14 35 13 35 233\nREMOVE 13 35 13 34 234\nREMOVE 13 34 12 34 235\nREMOVE 12 34 11 34 236\nREMOVE 11 34 10 34 237\nREMOVE 10 34 10 33 238\nREMOVE 10 33 11 33 239\nREMOVE 11 33 11 32 240\nREMOVE 11 32 10 32 241\nREMOVE 10 32 9 32 242\nREMOVE 9 32 8 32 243\nREMOVE 8 32 8 31 244\nREMOVE 8 31 8 30 245\nREMOVE 8 30 9 30 246\nREMOVE 9 30 9 29 247\nREMOVE 9 29 9 28 248\nREMOVE 9 28 9 27 249\nREMOVE 9 27 9 26 250\nREMOVE 9 26 8 26 251\nREMOVE 8 26 7 26 252\nREMOVE 7 26 7 27 253\nREMOVE 7 27 8 27 254\nREMOVE 8 27 8 28 255\nREMOVE 8 28 8 29 256\nREMOVE 8 29 7 29 257\nREMOVE 7 29 6 29 258\nREMOVE 6 29 6 30 259\nREMOVE 6 30 6 31 260\nREMOVE 6 31 7 31 261\nREMOVE 7 31 7 32 262\nREMOVE 7 32 6 32 263\nREMOVE 6 32 5 32 264\nREMOVE 5 32 5 33 265\nREMOVE 5 33 6 33 266\nREMOVE 6 33 6 34 267\nREMOVE 6 34 5 34 268\nREMOVE 5 34 4 34 269\nREMOVE 4 34 4 35 270\nREMOVE 4 35 3 35 271\nREMOVE 3 35 3 34 272\nREMOVE 3 34 3 33 273\nREMOVE 3 33 2 33 274\nREMOVE 2 33 2 32 275\nREMOVE 2 32 3 32 276\nREMOVE 3 32 3 31 277\nREMOVE 3 31 3 30 278\nREMOVE 3 30 2 30 279\nREMOVE 2 30 1 30 280\nREMOVE 1 30 1 29 281\nREMOVE 1 29 1 28 282\nREMOVE 1 28 1 27 283\nREMOVE 1 27 0 27 284\nREMOVE 0 27 0 26 285\nREMOVE 0 26 0 25 286\nREMOVE 0 25 0 24 287\nBACKTRACK 0 24\nREMOVE 0 25 1 25 287\nREMOVE 1 25 2 25 288\nREMOVE 2 25 2 26 289\nREMOVE 2 26 1 26 290\nBACKTRACK 1 26\nREMOVE 2 26 2 27 290\nREMOVE 2 27 2 28 291\nREMOVE 2 28 2 29 292\nREMOVE 2 29 3 29 293\nREMOVE 3 29 4 29 294\nREMOVE 4 29 4 30 295\nREMOVE 4 30 4 31 296\nREMOVE 4 31 4 32 297\nREMOVE 4 32 4 33 298\nBACKTRACK 4 33\nBACKTRACK 4 32\nREMOVE 4 31 5 31 297\nREMOVE 5 31 5 30 298\nREMOVE 5 30 5 29 299\nREMOVE 5 29 5 28 300\nREMOVE 5 28 5 27 301\nREMOVE 5 27 5 26 302\nREMOVE 5 26 6 26 303\nREMOVE 6 26 6 27 304\nREMOVE 6 27 6 28 305\nREMOVE 6 28 7 28 306\nBACKTRACK 7 28\nBACKTRACK 6 28\nBACKTRACK 6 27\nBACKTRACK 6 26\nBACKTRACK 5 26\nREMOVE 5 27 4 27 302\nREMOVE 4 27 3 27 303\nREMOVE 3 27 3 28 304\nREMOVE 3 28 4 28 305\nBACKTRACK 4 28\nBACKTRACK 3 28\nBACKTRACK 3 27\nBACKTRACK 4 27\nBACKTRACK 5 27\nBACKTRACK 5 28\nBACKTRACK 5 29\nBACKTRACK 5 30\nBACKTRACK 5 31\nBACKTRACK 4 31\nBACKTRACK 4 30\nBACKTRACK 4 29\nBACKTRACK 3 29\nBACKTRACK 2 29\nBACKTRACK 2 28\nBACKTRACK 2 27\nBACKTRACK 2 26\nBACKTRACK 2 25\nBACKTRACK 1 25\nBACKTRACK 0 25\nBACKTRACK 0 26\nREMOVE 0 27 0 28 285\nREMOVE 0 28 0 29 286\nREMOVE 0 29 0 30 287\nREMOVE 0 30 0 31 288\nREMOVE 0 31 0 32 289\nREMOVE 0 32 0 33 290\nREMOVE 0 33 1 33 291\nREMOVE 1 33 1 34 292\nREMOVE 1 34 1 35 293\nREMOVE 1 35 0 35 294\nREMOVE 0 35 0 34 295\nBACKTRACK 0 34\nBACKTRACK 0 35\nREMOVE 1 35 2 35 294\nREMOVE 2 35 2 34 295\nBACKTRACK 2 34\nBACKTRACK 2 35\nBACKTRACK 1 35\nBACKTRACK 1 34\nREMOVE 1 33 1 32 292\nREMOVE 1 32 1 31 293\nREMOVE 1 31 2 31 294\nBACKTRACK 2 31\nBACKTRACK 1 31\nBACKTRACK 1 32\nBACKTRACK 1 33\nBACKTRACK 0 33\nBACKTRACK 0 32\nBACKTRACK 0 31\nBACKTRACK 0 30\nBACKTRACK 0 29\nBACKTRACK 0 28\nBACKTRACK 0 27\nBACKTRACK 1 27\nBACKTRACK 1 28\nBACKTRACK 1 29\nBACKTRACK 1 30\nBACKTRACK 2 30\nBACKTRACK 3 30\nBACKTRACK 3 31\nBACKTRACK 3 32\nBACKTRACK 2 32\nBACKTRACK 2 33\nBACKTRACK 3 33\nBACKTRACK 3 34\nBACKTRACK 3 35\nREMOVE 4 35 5 35 271\nREMOVE 5 35 6 35 272\nREMOVE 6 35 7 35 273\nREMOVE 7 35 8 35 274\nREMOVE 8 35 9 35 275\nREMOVE 9 35 9 34 276\nREMOVE 9 34 9 33 277\nREMOVE 9 33 8 33 278\nREMOVE 8 33 8 34 279\nREMOVE 8 34 7 34 280\nREMOVE 7 34 7 33 281\nBACKTRACK 7 33\nBACKTRACK 7 34\nBACKTRACK 8 34\nBACKTRACK 8 33\nBACKTRACK 9 33\nBACKTRACK 9 34\nREMOVE 9 35 10 35 276\nREMOVE 10 35 11 35 277\nREMOVE 11 35 12 35 278\nBACKTRACK 12 35\nBACKTRACK 11 35\nBACKTRACK 10 35\nBACKTRACK 9 35\nBACKTRACK 8 35\nBACKTRACK 7 35\nBACKTRACK 6 35\nBACKTRACK 5 35\nBACKTRACK 4 35\nBACKTRACK 4 34\nBACKTRACK 5 34\nBACKTRACK 6 34\nBACKTRACK 6 33\nBACKTRACK 5 33\nBACKTRACK 5 32\nBACKTRACK 6 32\nBACKTRACK 7 32\nREMOVE 7 31 7 30 262\nBACKTRACK 7 30\nBACKTRACK 7 31\nBACKTRACK 6 31\nBACKTRACK 6 30\nBACKTRACK 6 29\nBACKTRACK 7 29\nBACKTRACK 8 29\nBACKTRACK 8 28\nBACKTRACK 8 27\nBACKTRACK 7 27\nBACKTRACK 7 26\nBACKTRACK 8 26\nBACKTRACK 9 26\nBACKTRACK 9 27\nREMOVE 9 28 10 28 249\nREMOVE 10 28 10 29 250\nREMOVE 10 29 10 30 251\nREMOVE 10 30 10 31 252\nREMOVE 10 31 9 31 253\nBACKTRACK 9 31\nREMOVE 10 31 11 31 253\nREMOVE 11 31 12 31 254\nREMOVE 12 31 12 32 255\nREMOVE 12 32 12 33 256\nBACKTRACK 12 33\nBACKTRACK 12 32\nBACKTRACK 12 31\nREMOVE 11 31 11 30 254\nBACKTRACK 11 30\nBACKTRACK 11 31\nBACKTRACK 10 31\nBACKTRACK 10 30\nBACKTRACK 10 29\nBACKTRACK 10 28\nBACKTRACK 9 28\nBACKTRACK 9 29\nBACKTRACK 9 30\nBACKTRACK 8 30\nBACKTRACK 8 31\nBACKTRACK 8 32\nBACKTRACK 9 32\nBACKTRACK 10 32\nBACKTRACK 11 32\nBACKTRACK 11 33\nBACKTRACK 10 33\nBACKTRACK 10 34\nBACKTRACK 11 34\nBACKTRACK 12 34\nBACKTRACK 13 34\nBACKTRACK 13 35\nREMOVE 14 35 15 35 233\nREMOVE 15 35 15 34 234\nREMOVE 15 34 15 33 235\nREMOVE 15 33 16 33 236\nREMOVE 16 33 17 33 237\nREMOVE 17 33 18 33 238\nREMOVE 18 33 19 33 239\nREMOVE 19 33 20 33 240\nREMOVE 20 33 21 33 241\nREMOVE 21 33 21 34 242\nREMOVE 21 34 22 34 243\nREMOVE 22 34 22 35 244\nREMOVE 22 35 21 35 245\nREMOVE 21 35 20 35 246\nREMOVE 20 35 19 35 247\nREMOVE 19 35 19 34 248\nREMOVE 19 34 18 34 249\nREMOVE 18 34 18 35 250\nREMOVE 18 35 17 35 251\nREMOVE 17 35 17 34 252\nREMOVE 17 34 16 34 253\nREMOVE 16 34 16 35 254\nBACKTRACK 16 35\nBACKTRACK 16 34\nBACKTRACK 17 34\nBACKTRACK 17 35\nBACKTRACK 18 35\nBACKTRACK 18 34\nREMOVE 19 34 20 34 249\nBACKTRACK 20 34\nBACKTRACK 19 34\nBACKTRACK 19 35\nBACKTRACK 20 35\nBACKTRACK 21 35\nREMOVE 22 35 23 35 245\nREMOVE 23 35 23 34 246\nREMOVE 23 34 23 33 247\nREMOVE 23 33 23 32 248\nREMOVE 23 32 23 31 249\nREMOVE 23 31 23 30 250\nREMOVE 23 30 23 29 251\nREMOVE 23 29 23 28 252\nREMOVE 23 28 23 27 253\nREMOVE 23 27 23 26 254\nREMOVE 23 26 23 25 255\nREMOVE 23 25 23 24 256\nREMOVE 23 24 23 23 257\nREMOVE 23 23 23 22 258\nREMOVE 23 22 23 21 259\nREMOVE 23 21 22 21 260\nREMOVE 22 21 22 20 261\nREMOVE 22 20 23 20 262\nREMOVE 23 20 23 19 263\nREMOVE 23 19 22 19 264\nREMOVE 22 19 21 19 265\nREMOVE 21 19 21 20 266\nREMOVE 21 20 20 20 267\nREMOVE 20 20 20 21 268\nREMOVE 20 21 21 21 269\nREMOVE 21 21 21 22 270\nREMOVE 21 22 22 22 271\nREMOVE 22 22 22 23 272\nREMOVE 22 23 22 24 273\nBACKTRACK 22 24\nREMOVE 22 23 21 23 273\nREMOVE 21 23 20 23 274\nREMOVE 20 23 20 22 275\nREMOVE 20 22 19 22 276\nREMOVE 19 22 19 21 277\nREMOVE 19 21 19 20 278\nREMOVE 19 20 18 20 279\nREMOVE 18 20 18 19 280\nBACKTRACK 18 19\nBACKTRACK 18 20\nBACKTRACK 19 20\nBACKTRACK 19 21\nBACKTRACK 19 22\nBACKTRACK 20 22\nBACKTRACK 20 23\nBACKTRACK 21 23\nBACKTRACK 22 23\nBACKTRACK 22 22\nBACKTRACK 21 22\nBACKTRACK 21 21\nBACKTRACK 20 21\nBACKTRACK 20 20\nBACKTRACK 21 20\nBACKTRACK 21 19\nBACKTRACK 22 19\nREMOVE 23 19 23 18 264\nBACKTRACK 23 18\nBACKTRACK 23 19\nBACKTRACK 23 20\nBACKTRACK 22 20\nBACKTRACK 22 21\nBACKTRACK 23 21\nBACKTRACK 23 22\nBACKTRACK 23 23\nBACKTRACK 23 24\nBACKTRACK 23 25\nBACKTRACK 23 26\nBACKTRACK 23 27\nREMOVE 23 28 22 28 253\nREMOVE 22 28 22 29 254\nREMOVE 22 29 21 29 255\nREMOVE 21 29 21 30 256\nREMOVE 21 30 21 31 257\nREMOVE 21 31 21 32 258\nREMOVE 21 32 22 32 259\nREMOVE 22 32 22 31 260\nREMOVE 22 31 22 30 261\nBACKTRACK 22 30\nBACKTRACK 22 31\nREMOVE 22 32 22 33 260\nBACKTRACK 22 33\nBACKTRACK 22 32\nREMOVE 21 32 20 32 259\nREMOVE 20 32 19 32 260\nREMOVE 19 32 19 31 261\nREMOVE 19 31 18 31 262\nREMOVE 18 31 18 32 263\nBACKTRACK 18 32\nREMOVE 18 31 18 30 263\nREMOVE 18 30 18 29 264\nREMOVE 18 29 17 29 265\nREMOVE 17 29 17 28 266\nREMOVE 17 28 18 28 267\nREMOVE 18 28 19 28 268\nREMOVE 19 28 20 28 269\nREMOVE 20 28 21 28 270\nBACKTRACK 21 28\nREMOVE 20 28 20 27 270\nREMOVE 20 27 19 27 271\nREMOVE 19 27 18 27 272\nREMOVE 18 27 17 27 273\nBACKTRACK 17 27\nBACKTRACK 18 27\nBACKTRACK 19 27\nBACKTRACK 20 27\nREMOVE 20 28 20 29 270\nREMOVE 20 29 19 29 271\nREMOVE 19 29 19 30 272\nREMOVE 19 30 20 30 273\nREMOVE 20 30 20 31 274\nBACKTRACK 20 31\nBACKTRACK 20 30\nBACKTRACK 19 30\nBACKTRACK 19 29\nBACKTRACK 20 29\nBACKTRACK 20 28\nBACKTRACK 19 28\nBACKTRACK 18 28\nBACKTRACK 17 28\nREMOVE 17 29 17 30 266\nBACKTRACK 17 30\nBACKTRACK 17 29\nBACKTRACK 18 29\nBACKTRACK 18 30\nBACKTRACK 18 31\nBACKTRACK 19 31\nBACKTRACK 19 32\nBACKTRACK 20 32\nBACKTRACK 21 32\nBACKTRACK 21 31\nBACKTRACK 21 30\nBACKTRACK 21 29\nBACKTRACK 22 29\nBACKTRACK 22 28\nBACKTRACK 23 28\nBACKTRACK 23 29\nBACKTRACK 23 30\nBACKTRACK 23 31\nBACKTRACK 23 32\nBACKTRACK 23 33\nBACKTRACK 23 34\nBACKTRACK 23 35\nBACKTRACK 22 35\nBACKTRACK 22 34\nBACKTRACK 21 34\nBACKTRACK 21 33\nBACKTRACK 20 33\nBACKTRACK 19 33\nBACKTRACK 18 33\nBACKTRACK 17 33\nBACKTRACK 16 33\nBACKTRACK 15 33\nBACKTRACK 15 34\nBACKTRACK 15 35\nBACKTRACK 14 35\nBACKTRACK 14 34\nBACKTRACK 14 33\nBACKTRACK 13 33\nBACKTRACK 13 32\nBACKTRACK 13 31\nBACKTRACK 14 31\nBACKTRACK 14 32\nBACKTRACK 15 32\nBACKTRACK 16 32\nBACKTRACK 17 32\nBACKTRACK 17 31\nBACKTRACK 16 31\nBACKTRACK 16 30\nBACKTRACK 16 29\nBACKTRACK 15 29\nBACKTRACK 14 29\nBACKTRACK 13 29\nBACKTRACK 13 30\nBACKTRACK 12 30\nBACKTRACK 12 29\nBACKTRACK 11 29\nBACKTRACK 11 28\nBACKTRACK 11 27\nBACKTRACK 10 27\nBACKTRACK 10 26\nBACKTRACK 10 25\nBACKTRACK 9 25\nBACKTRACK 8 25\nBACKTRACK 7 25\nBACKTRACK 6 25\nBACKTRACK 5 25\nBACKTRACK 4 25\nBACKTRACK 4 26\nBACKTRACK 3 26\nBACKTRACK 3 25\nBACKTRACK 3 24\nBACKTRACK 2 24\nBACKTRACK 1 24\nBACKTRACK 1 23\nBACKTRACK 0 23\nBACKTRACK 0 22\nBACKTRACK 0 21\nBACKTRACK 0 20\nREMOVE 0 19 0 18 189\nBACKTRACK 0 18\nBACKTRACK 0 19\nBACKTRACK 1 19\nBACKTRACK 1 18\nBACKTRACK 1 17\nBACKTRACK 0 17\nBACKTRACK 0 16\nBACKTRACK 1 16\nBACKTRACK 2 16\nBACKTRACK 3 16\nBACKTRACK 3 17\nBACKTRACK 2 17\nBACKTRACK 2 18\nBACKTRACK 3 18\nBACKTRACK 3 19\nBACKTRACK 4 19\nBACKTRACK 5 19\nBACKTRACK 6 19\nBACKTRACK 7 19\nBACKTRACK 7 20\nBACKTRACK 8 20\nBACKTRACK 8 21\nBACKTRACK 9 21\nBACKTRACK 10 21\nBACKTRACK 10 22\nBACKTRACK 10 23\nBACKTRACK 11 23\nBACKTRACK 11 24\nBACKTRACK 11 25\nBACKTRACK 11 26\nBACKTRACK 12 26\nBACKTRACK 13 26\nBACKTRACK 14 26\nBACKTRACK 14 27\nBACKTRACK 13 27\nBACKTRACK 12 27\nBACKTRACK 12 28\nBACKTRACK 13 28\nBACKTRACK 14 28\nBACKTRACK 15 28\nBACKTRACK 16 28\nBACKTRACK 16 27\nBACKTRACK 16 26\nBACKTRACK 17 26\nREMOVE 18 26 18 25 146\nBACKTRACK 18 25\nBACKTRACK 18 26\nBACKTRACK 19 26\nBACKTRACK 19 25\nBACKTRACK 20 25\nBACKTRACK 20 26\nBACKTRACK 21 26\nBACKTRACK 21 27\nBACKTRACK 22 27\nBACKTRACK 22 26\nBACKTRACK 22 25\nBACKTRACK 21 25\nBACKTRACK 21 24\nBACKTRACK 20 24\nBACKTRACK 19 24\nBACKTRACK 19 23\nREMOVE 18 23 17 23 131\nBACKTRACK 17 23\nBACKTRACK 18 23\nBACKTRACK 18 24\nBACKTRACK 17 24\nBACKTRACK 17 25\nBACKTRACK 16 25\nBACKTRACK 16 24\nBACKTRACK 16 23\nREMOVE 16 22 16 21 124\nBACKTRACK 16 21\nBACKTRACK 16 22\nBACKTRACK 17 22\nBACKTRACK 18 22\nBACKTRACK 18 21\nBACKTRACK 17 21\nBACKTRACK 17 20\nBACKTRACK 16 20\nBACKTRACK 15 20\nBACKTRACK 15 21\nBACKTRACK 14 21\nBACKTRACK 14 22\nBACKTRACK 14 23\nBACKTRACK 13 23\nBACKTRACK 13 22\nBACKTRACK 13 21\nBACKTRACK 13 20\nBACKTRACK 14 20\nBACKTRACK 14 19\nBACKTRACK 15 19\nBACKTRACK 16 19\nBACKTRACK 17 19\nBACKTRACK 17 18\nBACKTRACK 18 18\nBACKTRACK 19 18\nBACKTRACK 19 19\nBACKTRACK 20 19\nBACKTRACK 20 18\nBACKTRACK 21 18\nBACKTRACK 22 18\nREMOVE 22 17 22 16 95\nBACKTRACK 22 16\nBACKTRACK 22 17\nBACKTRACK 23 17\nBACKTRACK 23 16\nBACKTRACK 23 15\nBACKTRACK 22 15\nBACKTRACK 22 14\nBACKTRACK 22 13\nBACKTRACK 21 13\nBACKTRACK 21 14\nREMOVE 21 15 20 15 86\nBACKTRACK 20 15\nBACKTRACK 21 15\nBACKTRACK 21 16\nBACKTRACK 21 17\nBACKTRACK 20 17\nBACKTRACK 20 16\nBACKTRACK 19 16\nBACKTRACK 19 15\nREMOVE 19 14 19 13 79\nREMOVE 19 13 19 12 80\nBACKTRACK 19 12\nBACKTRACK 19 13\nBACKTRACK 19 14\nBACKTRACK 20 14\nBACKTRACK 20 13\nREMOVE 20 12 20 11 76\nBACKTRACK 20 11\nBACKTRACK 20 12\nBACKTRACK 21 12\nBACKTRACK 21 11\nBACKTRACK 21 10\nBACKTRACK 21 9\nBACKTRACK 21 8\nBACKTRACK 20 8\nBACKTRACK 19 8\nBACKTRACK 19 9\nBACKTRACK 20 9\nBACKTRACK 20 10\nBACKTRACK 19 10\nBACKTRACK 19 11\nBACKTRACK 18 11\nBACKTRACK 18 12\nBACKTRACK 18 13\nBACKTRACK 17 13\nBACKTRACK 17 12\nBACKTRACK 17 11\nBACKTRACK 16 11\nBACKTRACK 16 12\nBACKTRACK 16 13\nBACKTRACK 16 14\nBACKTRACK 15 14\nBACKTRACK 15 13\nBACKTRACK 14 13\nBACKTRACK 13 13\nBACKTRACK 13 12\nBACKTRACK 14 12\nBACKTRACK 15 12\nBACKTRACK 15 11\nBACKTRACK 15 10\nBACKTRACK 16 10\nBACKTRACK 16 9\nBACKTRACK 16 8\nBACKTRACK 16 7\nBACKTRACK 15 7\nBACKTRACK 14 7\nBACKTRACK 14 6\nBACKTRACK 13 6\nBACKTRACK 13 5\nBACKTRACK 12 5\nBACKTRACK 11 5\nBACKTRACK 11 4\nBACKTRACK 11 3\nBACKTRACK 11 2\nBACKTRACK 10 2\nBACKTRACK 10 3\nBACKTRACK 9 3\nBACKTRACK 9 2\nREMOVE 9 1 8 1 26\nBACKTRACK 8 1\nBACKTRACK 9 1\nBACKTRACK 10 1\nBACKTRACK 11 1\nBACKTRACK 11 0\nBACKTRACK 10 0\nBACKTRACK 9 0\nBACKTRACK 8 0\nREMOVE 7 0 6 0 19\nREMOVE 6 0 6 1 20\nBACKTRACK 6 1\nBACKTRACK 6 0\nBACKTRACK 7 0\nBACKTRACK 7 1\nBACKTRACK 7 2\nBACKTRACK 8 2\nBACKTRACK 8 3\nBACKTRACK 8 4\nBACKTRACK 7 4\nBACKTRACK 7 3\nBACKTRACK 6 3\nBACKTRACK 6 2\nBACKTRACK 5 2\nBACKTRACK 5 1\nBACKTRACK 5 0\nBACKTRACK 4 0\nBACKTRACK 3 0\nBACKTRACK 2 0\nBACKTRACK 1 0\nBACKTRACK 0 0\nDONE 864 863\nBFS 0 0 0\nBFS 1 0 1\nBFS 2 0 2\nBFS 3 0 3\nBFS 4 0 4\nBFS 5 0 5\nBFS 5 1 6\nBFS 5 2 7\nBFS 6 2 8\nBFS 6 3 9\nBFS 7 3 10\nBFS 7 4 11\nBFS 8 4 12\nBFS 8 3 13\nBFS 8 2 14\nBFS 7 2 15\nBFS 7 1 16\nBFS 7 0 17\nBFS 6 0 18\nBFS 8 0 18\nBFS 6 1 19\nBFS 9 0 19\nBFS 10 0 20\nBFS 11 0 21\nBFS 11 1 22\nBFS 10 1 23\nBFS 9 1 24\nBFS 8 1 25\nBFS 9 2 25\nBFS 9 3 26\nBFS 10 3 27\nBFS 10 2 28\nBFS 11 2 29\nBFS 11 3 30\nBFS 11 4 31\nBFS 11 5 32\nBFS 12 5 33\nBFS 13 5 34\nBFS 13 6 35\nBFS 14 6 36\nBFS 14 7 37\nBFS 15 7 38\nBFS 16 7 39\nBFS 16 8 40\nBFS 16 9 41\nBFS 16 10 42\nBFS 15 10 43\nBFS 15 11 44\nBFS 15 12 45\nBFS 14 12 46\nBFS 13 12 47\nBFS 13 13 48\nBFS 14 13 49\nBFS 15 13 50\nBFS 15 14 51\nBFS 16 14 52\nBFS 16 13 53\nBFS 16 12 54\nBFS 16 11 55\nBFS 17 11 56\nBFS 17 12 57\nBFS 17 13 58\nBFS 18 13 59\nBFS 18 12 60\nBFS 18 11 61\nBFS 19 11 62\nBFS 19 10 63\nBFS 20 10 64\nBFS 20 9 65\nBFS 19 9 66\nBFS 19 8 67\nBFS 20 8 68\nBFS 21 8 69\nBFS 21 9 70\nBFS 21 10 71\nBFS 21 11 72\nBFS 21 12 73\nBFS 20 12 74\nBFS 20 13 75\nBFS 20 11 75\nBFS 20 14 76\nBFS 19 14 77\nBFS 19 15 78\nBFS 19 13 78\nBFS 19 16 79\nBFS 19 12 79\nBFS 20 16 80\nBFS 20 17 81\nBFS 21 17 82\nBFS 21 16 83\nBFS 21 15 84\nBFS 20 15 85\nBFS 21 14 85\nBFS 21 13 86\nBFS 22 13 87\nBFS 22 14 88\nBFS 22 15 89\nBFS 23 15 90\nBFS 23 16 91\nBFS 23 14 91\nBFS 23 17 92\nBFS 23 13 92\nBFS 22 17 93\nBFS 23 12 93\nBFS 22 18 94\nBFS 22 16 94\nBFS 22 12 94\nBFS 21 18 95\nBFS 22 11 95\nBFS 20 18 96\nBFS 22 10 96\nBFS 20 19 97\nBFS 23 10 97\nBFS 19 19 98\nBFS 23 11 98\nBFS 23 9 98\nBFS 19 18 99\nBFS 23 8 99\nBFS 18 18 100\nBFS 22 8 100\nBFS 17 18 101\nBFS 22 9 101\nBFS 22 7 101\nBFS 17 19 102\nBFS 23 7 102\nBFS 16 19 103\nBFS 23 6 103\nBFS 15 19 104\nBFS 22 6 104\nBFS 14 19 105\nBFS 21 6 105\nBFS 14 20 106\nBFS 21 5 106\nBFS 13 20 107\nBFS 22 5 107\nBFS 13 21 108\nBFS 23 5 108\nBFS 13 22 109\nBFS 23 4 109\nBFS 13 23 110\nBFS 22 4 110\nBFS 14 23 111\nBFS 22 3 111\nBFS 14 22 112\nBFS 22 2 112\nBFS 14 21 113\nBFS 22 1 113\nBFS 15 21 114\nBFS 22 0 114\nBFS 15 20 115\nBFS 21 0 115\nBFS 23 0 115\nBFS 16 20 116\nBFS 20 0 116\nBFS 23 1 116\nBFS 17 20 117\nBFS 20 1 117\nBFS 23 2 117\nBFS 17 21 118\nBFS 19 1 118\nBFS 23 3 118\nBFS 18 21 119\nBFS 18 1 119\nBFS 18 22 120\nBFS 18 0 120\nBFS 17 22 121\nBFS 17 0 121\nBFS 19 0 121\nBFS 16 22 122\nBFS 17 1 122\nBFS 16 23 123\nBFS 16 21 123\nBFS 16 1 123\nBFS 16 24 124\nBFS 16 2 124\nBFS 16 25 125\nBFS 16 3 125\nBFS 17 25 126\nBFS 17 3 126\nBFS 17 24 127\nBFS 17 2 127\nBFS 18 24 128\nBFS 18 2 128\nBFS 18 23 129\nBFS 18 3 129\nBFS 17 23 130\nBFS 19 23 130\nBFS 19 3 130\nBFS 19 24 131\nBFS 19 4 131\nBFS 20 24 132\nBFS 19 5 132\nBFS 21 24 133\nBFS 19 6 133\nBFS 21 25 134\nBFS 20 6 134\nBFS 22 25 135\nBFS 20 7 135\nBFS 20 5 135\nBFS 22 26 136\nBFS 19 7 136\nBFS 21 7 136\nBFS 20 4 136\nBFS 22 27 137\nBFS 18 7 137\nBFS 21 4 137\nBFS 21 27 138\nBFS 18 6 138\nBFS 21 3 138\nBFS 21 26 139\nBFS 18 5 139\nBFS 21 2 139\nBFS 20 26 140\nBFS 18 4 140\nBFS 20 2 140\nBFS 21 1 140\nBFS 20 25 141\nBFS 17 4 141\nBFS 19 2 141\nBFS 20 3 141\nBFS 19 25 142\nBFS 17 5 142\nBFS 19 26 143\nBFS 16 5 143\nBFS 18 26 144\nBFS 16 4 144\nBFS 17 26 145\nBFS 18 25 145\nBFS 15 4 145\nBFS 16 26 146\nBFS 14 4 146\nBFS 16 27 147\nBFS 13 4 147\nBFS 14 5 147\nBFS 16 28 148\nBFS 12 4 148\nBFS 15 5 148\nBFS 15 28 149\nBFS 12 3 149\nBFS 15 6 149\nBFS 14 28 150\nBFS 12 2 150\nBFS 16 6 150\nBFS 13 28 151\nBFS 13 2 151\nBFS 17 6 151\nBFS 12 28 152\nBFS 14 2 152\nBFS 17 7 152\nBFS 12 27 153\nBFS 14 3 153\nBFS 17 8 153\nBFS 13 27 154\nBFS 13 3 154\nBFS 15 3 154\nBFS 18 8 154\nBFS 14 27 155\nBFS 15 2 155\nBFS 18 9 155\nBFS 14 26 156\nBFS 15 1 156\nBFS 18 10 156\nBFS 13 26 157\nBFS 15 0 157\nBFS 17 10 157\nBFS 12 26 158\nBFS 14 0 158\nBFS 16 0 158\nBFS 17 9 158\nBFS 11 26 159\nBFS 14 1 159\nBFS 11 25 160\nBFS 13 1 160\nBFS 11 24 161\nBFS 12 1 161\nBFS 11 23 162\nBFS 12 0 162\nBFS 10 23 163\nBFS 13 0 163\nBFS 10 22 164\nBFS 10 21 165\nBFS 9 21 166\nBFS 8 21 167\nBFS 8 20 168\nBFS 7 20 169\nBFS 7 19 170\nBFS 6 19 171\nBFS 5 19 172\nBFS 4 19 173\nBFS 3 19 174\nBFS 3 18 175\nBFS 2 18 176\nBFS 2 17 177\nBFS 3 17 178\nBFS 3 16 179\nBFS 2 16 180\nBFS 1 16 181\nBFS 0 16 182\nBFS 0 17 183\nBFS 0 15 183\nBFS 1 17 184\nBFS 1 15 184\nBFS 1 18 185\nBFS 1 14 185\nBFS 1 19 186\nBFS 1 13 186\nBFS 0 19 187\nBFS 1 12 187\nBFS 0 20 188\nBFS 0 18 188\nBFS 0 12 188\nBFS 0 21 189\nBFS 0 13 189\nBFS 0 11 189\nBFS 0 22 190\nBFS 0 14 190\nBFS 1 11 190\nBFS 0 23 191\nBFS 1 10 191\nBFS 1 23 192\nBFS 0 10 192\nBFS 1 24 193\nBFS 0 9 193\nBFS 2 24 194\nBFS 0 8 194\nBFS 3 24 195\nBFS 0 7 195\nBFS 3 25 196\nBFS 1 7 196\nBFS 3 26 197\nBFS 1 8 197\nBFS 4 26 198\nBFS 1 9 198\nBFS 4 25 199\nBFS 2 9 199\nBFS 5 25 200\nBFS 2 8 200\nBFS 6 25 201\nBFS 3 8 201\nBFS 7 25 202\nBFS 3 9 202\nBFS 8 25 203\nBFS 4 9 203\nBFS 9 25 204\nBFS 4 8 204\nBFS 10 25 205\nBFS 5 8 205\nBFS 10 26 206\nBFS 10 24 206\nBFS 5 7 206\nBFS 10 27 207\nBFS 9 24 207\nBFS 5 6 207\nBFS 11 27 208\nBFS 8 24 208\nBFS 4 6 208\nBFS 11 28 209\nBFS 7 24 209\nBFS 4 5 209\nBFS 11 29 210\nBFS 7 23 210\nBFS 4 4 210\nBFS 12 29 211\nBFS 7 22 211\nBFS 5 4 211\nBFS 12 30 212\nBFS 8 22 212\nBFS 7 21 212\nBFS 5 5 212\nBFS 5 3 212\nBFS 13 30 213\nBFS 8 23 213\nBFS 6 21 213\nBFS 6 5 213\nBFS 4 3 213\nBFS 13 29 214\nBFS 9 23 214\nBFS 5 21 214\nBFS 7 5 214\nBFS 6 4 214\nBFS 3 3 214\nBFS 14 29 215\nBFS 9 22 215\nBFS 5 20 215\nBFS 8 5 215\nBFS 3 2 215\nBFS 15 29 216\nBFS 4 20 216\nBFS 6 20 216\nBFS 8 6 216\nBFS 4 2 216\nBFS 16 29 217\nBFS 4 21 217\nBFS 7 6 217\nBFS 4 1 217\nBFS 16 30 218\nBFS 4 22 218\nBFS 7 7 218\nBFS 3 1 218\nBFS 16 31 219\nBFS 4 23 219\nBFS 8 7 219\nBFS 2 1 219\nBFS 17 31 220\nBFS 3 23 220\nBFS 5 23 220\nBFS 8 8 220\nBFS 1 1 220\nBFS 17 32 221\nBFS 3 22 221\nBFS 5 22 221\nBFS 8 9 221\nBFS 1 2 221\nBFS 16 32 222\nBFS 3 21 222\nBFS 6 22 222\nBFS 8 10 222\nBFS 0 2 222\nBFS 15 32 223\nBFS 2 21 223\nBFS 6 23 223\nBFS 9 10 223\nBFS 0 3 223\nBFS 0 1 223\nBFS 14 32 224\nBFS 2 20 224\nBFS 6 24 224\nBFS 9 11 224\nBFS 0 4 224\nBFS 14 31 225\nBFS 1 20 225\nBFS 3 20 225\nBFS 2 19 225\nBFS 5 24 225\nBFS 8 11 225\nBFS 1 4 225\nBFS 13 31 226\nBFS 14 30 226\nBFS 1 21 226\nBFS 4 24 226\nBFS 8 12 226\nBFS 1 3 226\nBFS 13 32 227\nBFS 15 30 227\nBFS 1 22 227\nBFS 8 13 227\nBFS 2 3 227\nBFS 13 33 228\nBFS 15 31 228\nBFS 2 22 228\nBFS 7 13 228\nBFS 2 4 228\nBFS 2 2 228\nBFS 14 33 229\nBFS 2 23 229\nBFS 6 13 229\nBFS 2 5 229\nBFS 14 34 230\nBFS 6 14 230\nBFS 2 6 230\nBFS 14 35 231\nBFS 6 15 231\nBFS 1 6 231\nBFS 3 6 231\nBFS 13 35 232\nBFS 15 35 232\nBFS 7 15 232\nBFS 0 6 232\nBFS 3 7 232\nBFS 3 5 232\nBFS 13 34 233\nBFS 15 34 233\nBFS 7 14 233\nBFS 0 5 233\nBFS 2 7 233\nBFS 4 7 233\nBFS 3 4 233\nBFS 12 34 234\nBFS 15 33 234\nBFS 8 14 234\nBFS 1 5 234\nBFS 11 34 235\nBFS 16 33 235\nBFS 9 14 235\nBFS 10 34 236\nBFS 17 33 236\nBFS 10 14 236\nBFS 10 33 237\nBFS 18 33 237\nBFS 10 15 237\nBFS 11 33 238\nBFS 19 33 238\nBFS 11 15 238\nBFS 11 32 239\nBFS 20 33 239\nBFS 11 14 239\nBFS 10 32 240\nBFS 21 33 240\nBFS 12 14 240\nBFS 9 32 241\nBFS 21 34 241\nBFS 13 14 241\nBFS 12 13 241\nBFS 8 32 242\nBFS 22 34 242\nBFS 13 15 242\nBFS 12 12 242\nBFS 8 31 243\nBFS 22 35 243\nBFS 14 15 243\nBFS 12 11 243\nBFS 8 30 244\nBFS 21 35 244\nBFS 23 35 244\nPATH_LEN 245 514\nPATH 0 0\nPATH 1 0\nPATH 2 0\nPATH 3 0\nPATH 4 0\nPATH 5 0\nPATH 5 1\nPATH 5 2\nPATH 6 2\nPATH 6 3\nPATH 7 3\nPATH 7 4\nPATH 8 4\nPATH 8 3\nPATH 8 2\nPATH 7 2\nPATH 7 1\nPATH 7 0\nPATH 8 0\nPATH 9 0\nPATH 10 0\nPATH 11 0\nPATH 11 1\nPATH 10 1\nPATH 9 1\nPATH 9 2\nPATH 9 3\nPATH 10 3\nPATH 10 2\nPATH 11 2\nPATH 11 3\nPATH 11 4\nPATH 11 5\nPATH 12 5\nPATH 13 5\nPATH 13 6\nPATH 14 6\nPATH 14 7\nPATH 15 7\nPATH 16 7\nPATH 16 8\nPATH 16 9\nPATH 16 10\nPATH 15 10\nPATH 15 11\nPATH 15 12\nPATH 14 12\nPATH 13 12\nPATH 13 13\nPATH 14 13\nPATH 15 13\nPATH 15 14\nPATH 16 14\nPATH 16 13\nPATH 16 12\nPATH 16 11\nPATH 17 11\nPATH 17 12\nPATH 17 13\nPATH 18 13\nPATH 18 12\nPATH 18 11\nPATH 19 11\nPATH 19 10\nPATH 20 10\nPATH 20 9\nPATH 19 9\nPATH 19 8\nPATH 20 8\nPATH 21 8\nPATH 21 9\nPATH 21 10\nPATH 21 11\nPATH 21 12\nPATH 20 12\nPATH 20 13\nPATH 20 14\nPATH 19 14\nPATH 19 15\nPATH 19 16\nPATH 20 16\nPATH 20 17\nPATH 21 17\nPATH 21 16\nPATH 21 15\nPATH 21 14\nPATH 21 13\nPATH 22 13\nPATH 22 14\nPATH 22 15\nPATH 23 15\nPATH 23 16\nPATH 23 17\nPATH 22 17\nPATH 22 18\nPATH 21 18\nPATH 20 18\nPATH 20 19\nPATH 19 19\nPATH 19 18\nPATH 18 18\nPATH 17 18\nPATH 17 19\nPATH 16 19\nPATH 15 19\nPATH 14 19\nPATH 14 20\nPATH 13 20\nPATH 13 21\nPATH 13 22\nPATH 13 23\nPATH 14 23\nPATH 14 22\nPATH 14 21\nPATH 15 21\nPATH 15 20\nPATH 16 20\nPATH 17 20\nPATH 17 21\nPATH 18 21\nPATH 18 22\nPATH 17 22\nPATH 16 22\nPATH 16 23\nPATH 16 24\nPATH 16 25\nPATH 17 25\nPATH 17 24\nPATH 18 24\nPATH 18 23\nPATH 19 23\nPATH 19 24\nPATH 20 24\nPATH 21 24\nPATH 21 25\nPATH 22 25\nPATH 22 26\nPATH 22 27\nPATH 21 27\nPATH 21 26\nPATH 20 26\nPATH 20 25\nPATH 19 25\nPATH 19 26\nPATH 18 26\nPATH 17 26\nPATH 16 26\nPATH 16 27\nPATH 16 28\nPATH 15 28\nPATH 14 28\nPATH 13 28\nPATH 12 28\nPATH 12 27\nPATH 13 27\nPATH 14 27\nPATH 14 26\nPATH 13 26\nPATH 12 26\nPATH 11 26\nPATH 11 25\nPATH 11 24\nPATH 11 23\nPATH 10 23\nPATH 10 22\nPATH 10 21\nPATH 9 21\nPATH 8 21\nPATH 8 20\nPATH 7 20\nPATH 7 19\nPATH 6 19\nPATH 5 19\nPATH 4 19\nPATH 3 19\nPATH 3 18\nPATH 2 18\nPATH 2 17\nPATH 3 17\nPATH 3 16\nPATH 2 16\nPATH 1 16\nPATH 0 16\nPATH 0 17\nPATH 1 17\nPATH 1 18\nPATH 1 19\nPATH 0 19\nPATH 0 20\nPATH 0 21\nPATH 0 22\nPATH 0 23\nPATH 1 23\nPATH 1 24\nPATH 2 24\nPATH 3 24\nPATH 3 25\nPATH 3 26\nPATH 4 26\nPATH 4 25\nPATH 5 25\nPATH 6 25\nPATH 7 25\nPATH 8 25\nPATH 9 25\nPATH 10 25\nPATH 10 26\nPATH 10 27\nPATH 11 27\nPATH 11 28\nPATH 11 29\nPATH 12 29\nPATH 12 30\nPATH 13 30\nPATH 13 29\nPATH 14 29\nPATH 15 29\nPATH 16 29\nPATH 16 30\nPATH 16 31\nPATH 17 31\nPATH 17 32\nPATH 16 32\nPATH 15 32\nPATH 14 32\nPATH 14 31\nPATH 13 31\nPATH 13 32\nPATH 13 33\nPATH 14 33\nPATH 14 34\nPATH 14 35\nPATH 15 35\nPATH 15 34\nPATH 15 33\nPATH 16 33\nPATH 17 33\nPATH 18 33\nPATH 19 33\nPATH 20 33\nPATH 21 33\nPATH 21 34\nPATH 22 34\nPATH 22 35\nPATH 23 35\nWALLS 24 36\nW 1 0 1 1\nW 1 1 0 1\nW 1 0 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 1 0 0 0\nW 1 1 0 0\nW 1 1 1 0\nW 1 0 0 1\nW 1 0 0 0\nW 1 0 1 0\nW 1 1 0 1\nW 1 0 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 1 1 0 1\nW 1 0 0 0\nW 1 1 0 0\nW 1 0 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 1 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 0 0\nW 1 1 0 0\nW 0 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 1 0 1\nW 0 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 0 0 1 0\nW 1 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 1 0 0 0\nW 1 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 1 1 0 1\nW 0 0 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 0 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 1 1 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 1 1 0 1\nW 1 1 0 0\nW 0 1 0 0\nW 0 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 0 0\nW 1 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 0 0 1 0\nW 1 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 1 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 0 0\nW 1 1 0 0\nW 1 1 1 0\nW 1 0 0 1\nW 0 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 0 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 0 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 0 1 0 1\nW 0 0 1 0\nW 0 0 1 1\nW 0 1 1 1\nW 0 0 1 1\nW 0 0 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 1 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 1 1 0 1\nW 0 0 1 0\nW 1 1 0 1\nW 1 1 0 0\nW 1 0 0 0\nW 0 1 1 0\nW 1 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 0 1\nW 1 1 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 0 1 1 1\nW 0 0 1 1\nW 1 1 0 1\nW 0 1 0 0\nW 0 1 1 0\nW 1 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 1 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 0 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 0 1 1 0\nW 1 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 1 1 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 0 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 0 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 0 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 0 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 1 1 0 1\nW 0 0 1 0\nW 0 1 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 0 0 1 0\nW 1 1 0 1\nW 0 0 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 1 1 0 1\nW 0 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 1 0\nW 0 0 1 1\nW 0 1 1 1\nW 0 1 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 0 1 0 0\nW 1 1 0 0\nW 0 0 1 0\nW 1 0 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 0 0 1 0\nW 0 0 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 1 0 1\nW 0 0 1 0\nW 0 1 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 0 0 1 0\nW 0 0 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 1 1 0 1\nW 1 1 0 0\nW 0 1 0 0\nW 0 1 0 0\nW 1 1 0 0\nW 1 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 1 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 0 1\nW 1 0 1 0\nW 0 1 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 1 1 0 1\nW 1 0 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 1 1 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 1 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 1 0 1 1\nW 0 0 1 1\nW 0 1 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 1 0 1 1\nW 1 0 0 1\nW 1 0 0 0\nW 1 1 1 0\nW 0 1 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 0 1 0 1\nW 0 1 0 0\nW 1 1 0 0\nW 0 0 1 0\nW 0 0 1 1\nW 1 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 0 1 1 0\nW 0 0 0 1\nW 0 1 1 0\nW 1 1 0 1\nW 0 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 0 0\nW 1 1 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 1 1\nW 0 0 1 1\nW 1 0 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 1 1 0 1\nW 1 1 0 0\nW 1 0 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 0 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 0 0 0 1\nW 1 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 0 0\nW 0 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 0 1 1 0\nW 1 1 0 1\nW 1 0 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 1 0 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 0 0 0 0\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 0 1 1 1\nW 0 0 1 1\nW 0 0 1 1\nW 1 1 0 1\nW 0 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 1 0 1 0\nW 0 1 1 1\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 0 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 1 1 1\nW 1 0 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 0 0 1 0\nW 0 1 0 1\nW 1 0 1 0\nW 0 0 1 1\nW 0 0 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 0 1 0\nW 0 0 1 1\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 0 0\nW 1 1 1 0\nW 1 0 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 0 1 0\nW 1 1 0 1\nW 1 0 0 0\nW 0 1 1 0\nW 0 0 1 1\nW 1 0 0 1\nW 1 0 1 0\nW 0 1 0 1\nW 0 1 0 0\nW 1 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 1 0\nW 1 0 0 1\nW 0 1 1 0\nW 1 1 0 1\nW 1 1 0 0\nW 0 1 0 0\nW 1 1 1 0\nW 0 1 0 1\nW 0 0 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 1 0\nW 0 1 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 0 1 0 0\nW 1 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nW 1 1 0 1\nW 0 1 0 0\nW 0 1 1 0\nW 0 1 0 1\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 1 1 0 0\nW 0 1 1 0\nSTATS nodes=864 edges_in_graph=3456 tree_edges=863 backtracks=864"}];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let state = {
+  rows: 8, cols: 14, seed: 3003,
+  genEvents: [], solveEvents: [], pathEvents: [], wallData: [],
+  genIdx: 0, solveIdx: 0, pathIdx: 0,
+  phase: 'idle', // idle | gen | solve | path | done
+  paused: false,
+  stepModeActive: false,
+  animId: null,
+  speed: 1, // 0=slow 1=med 2=fast 3=turbo
+  speeds: [80, 25, 8, 1],
+  stats: {},
+  cellState: [], // per-cell state for drawing
+  maxStack: 0,
+  visitedCount: 0,
+  walls: [],
+  canvas: null, ctx: null, CELL: 20,
+  lastTime: 0,
+};
+
+const SPEEDS = [80, 25, 8, 1];
+
+/* ============================================================
+   C CODE SNIPPETS (displayed in code panel)
+   ============================================================ */
+const CODE = {
+  graph: `<span class="cm">/* GRAPH: Adjacency List
+   Each cell is a node.
+   Edges = potential passages. */</span>
+<span class="kw">typedef</span> <span class="kw">struct</span> AdjNode {
+    <span class="type">int</span> dest;
+    <span class="type">int</span> dir; <span class="cm">/* 0=N 1=S 2=E 3=W */</span>
+    <span class="kw">struct</span> AdjNode* next;
+} AdjNode;
+
+<span class="kw">typedef</span> <span class="kw">struct</span> {
+    AdjNode* head[MAX_CELLS];
+    <span class="type">int</span> num_cells, cols, rows;
+} Graph;
+
+<span class="kw">void</span> <span class="fn">graph_add_edge</span>(Graph* g,
+    <span class="type">int</span> u, <span class="type">int</span> v, <span class="type">int</span> dir) {
+    AdjNode* n = <span class="fn">malloc</span>(<span class="kw">sizeof</span>(AdjNode));
+    n->dest = v; n->dir = dir;
+    n->next = g->head[u];
+    g->head[u] = n; <span class="cm">/* prepend */</span>
+}`,
+
+  stack: `<span class="cm">/* STACK: Array-based LIFO
+   Used for DFS backtracking.
+   When no neighbors → pop! */</span>
+<span class="kw">typedef</span> <span class="kw">struct</span> {
+    <span class="type">int</span> data[MAX_CELLS];
+    <span class="type">int</span> top;
+} Stack;
+
+<span class="kw">void</span>  <span class="fn">stack_init</span>(Stack* s)       { s->top = -<span class="num">1</span>; }
+<span class="type">int</span>   <span class="fn">stack_empty</span>(Stack* s)      { <span class="kw">return</span> s->top == -<span class="num">1</span>; }
+<span class="kw">void</span>  <span class="fn">stack_push</span>(Stack* s, <span class="type">int</span> v) { s->data[++(s->top)] = v; }
+<span class="type">int</span>   <span class="fn">stack_pop</span>(Stack* s)         { <span class="kw">return</span> s->data[(s->top)--]; }
+<span class="type">int</span>   <span class="fn">stack_peek</span>(Stack* s)        { <span class="kw">return</span> s->data[s->top]; }
+<span class="type">int</span>   <span class="fn">stack_size</span>(Stack* s)        { <span class="kw">return</span> s->top + <span class="num">1</span>; }`,
+
+  queue: `<span class="cm">/* QUEUE: Array-based FIFO
+   Used for BFS solving.
+   FIFO guarantees shortest path! */</span>
+<span class="kw">typedef</span> <span class="kw">struct</span> {
+    <span class="type">int</span> data[MAX_CELLS];
+    <span class="type">int</span> front, rear;
+} Queue;
+
+<span class="kw">void</span> <span class="fn">queue_init</span>(Queue* q)        { q->front = q->rear = <span class="num">0</span>; }
+<span class="type">int</span>  <span class="fn">queue_empty</span>(Queue* q)       { <span class="kw">return</span> q->front == q->rear; }
+<span class="kw">void</span> <span class="fn">queue_push</span>(Queue* q, <span class="type">int</span> v) { q->data[q->rear++] = v; }
+<span class="type">int</span>  <span class="fn">queue_pop</span>(Queue* q)          { <span class="kw">return</span> q->data[q->front++]; }`,
+
+  dfs: `<span class="cm">/* DFS: Stack-based backtracker
+   Builds SPANNING TREE (perfect maze)
+   Every cell visited exactly once. */</span>
+<span class="fn">maze_generate</span>(Maze* m, Graph* g) {
+    Stack s; <span class="fn">stack_init</span>(&s);
+    m->visited[<span class="num">0</span>] = <span class="num">1</span>;
+    <span class="fn">stack_push</span>(&s, <span class="num">0</span>);
+
+    <span class="kw">while</span> (!<span class="fn">stack_empty</span>(&s)) {
+        <span class="type">int</span> cur = <span class="fn">stack_peek</span>(&s);
+        <span class="cm">/* find unvisited neighbors */</span>
+        <span class="kw">if</span> (count > <span class="num">0</span>) {
+            <span class="type">int</span> pick = rand() % count;
+            <span class="cm">/* remove wall (tree edge!) */</span>
+            <span class="fn">stack_push</span>(&s, next);
+        } <span class="kw">else</span> {
+            <span class="fn">stack_pop</span>(&s); <span class="cm">/* BACKTRACK */</span>
+        }
+    }
+}`,
+
+  bfs: `<span class="cm">/* BFS: Queue-based solver
+   FIFO = shortest path guaranteed
+   O(V+E) time complexity */</span>
+<span class="fn">maze_solve</span>(Maze* m, <span class="type">int</span> start, <span class="type">int</span> end) {
+    Queue q; <span class="fn">queue_init</span>(&q);
+    <span class="fn">queue_push</span>(&q, start);
+    vis[start] = <span class="num">1</span>;
+    <span class="type">int</span> prev[MAX] = {-<span class="num">1</span>};
+
+    <span class="kw">while</span> (!<span class="fn">queue_empty</span>(&q)) {
+        <span class="type">int</span> cur = <span class="fn">queue_pop</span>(&q);
+        <span class="kw">if</span> (cur == end) <span class="kw">break</span>;
+        <span class="cm">/* for each open neighbor: */</span>
+        <span class="fn">queue_push</span>(&q, neighbor);
+        prev[neighbor] = cur;
+    }
+    <span class="cm">/* trace back via prev[] */</span>
+}`,
+
+  tree: `<span class="cm">/* SPANNING TREE property:
+   - V nodes, V-1 edges
+   - No cycles
+   - All cells connected
+   - EXACTLY ONE path between
+     any two cells = perfect maze!
+   
+   Proof: DFS visits every node once.
+   Each REMOVE adds exactly one edge.
+   Total removed = V-1 = tree edges.
+   Result is a spanning tree of G. */</span>
+
+<span class="cm">/* Maze IS the spanning tree.
+   walls[i][d] == 0 means tree edge.
+   graph edge count = 4*(V) potential
+   tree keeps only V-1 of them. */</span>`,
+};
+
+/* ============================================================
+   PARSE MAZE DATA (from C output)
+   ============================================================ */
+function parseMazeData(raw) {
+  const lines = raw.split('\n');
+  const gen = [], bfsList = [], pathList = [], walls = [];
+  let stats = {}, rows = 0, cols = 0, inWalls = false, wallIdx = 0;
+
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const p = line.split(' ');
+    const cmd = p[0];
+
+    if (cmd === 'START') { gen.push({type:'start', r:+p[1], c:+p[2]}); }
+    else if (cmd === 'REMOVE') { gen.push({type:'remove', r1:+p[1], c1:+p[2], r2:+p[3], c2:+p[4], depth:+p[5]}); }
+    else if (cmd === 'BACKTRACK') { gen.push({type:'backtrack', r:+p[1], c:+p[2]}); }
+    else if (cmd === 'DONE') { stats.backtracks=+p[1]; stats.genSteps=+p[2]; }
+    else if (cmd === 'BFS') { bfsList.push({r:+p[1], c:+p[2], dist:+p[3]}); }
+    else if (cmd === 'PATH_LEN') { stats.pathLen=+p[1]; stats.bfsSteps=+p[2]; }
+    else if (cmd === 'PATH') { pathList.push({r:+p[1], c:+p[2]}); }
+    else if (cmd === 'WALLS') { rows=+p[1]; cols=+p[2]; inWalls=true; }
+    else if (cmd === 'W' && inWalls) {
+      walls.push([+p[1], +p[2], +p[3], +p[4]]);
+    }
+    else if (cmd === 'STATS') {
+      const parts = p.slice(1);
+      for (const kv of parts) {
+        const [k,v] = kv.split('=');
+        stats[k] = +v;
+      }
+    }
+  }
+  return { gen, bfsList, pathList, walls, stats, rows, cols };
+}
+
+/* ============================================================
+   CANVAS + DRAWING
+   ============================================================ */
+function initCanvas(rows, cols) {
+  const wrap = document.getElementById('maze-canvas-wrap');
+  wrap.innerHTML = '';
+  const canvas = document.createElement('canvas');
+  const W = wrap.clientWidth - 32, H = wrap.clientHeight - 16;
+  const cellW = Math.floor(W / cols), cellH = Math.floor(H / rows);
+  let CELL = Math.min(cellW, cellH, 38);
+  CELL = Math.max(CELL, 8);
+
+  canvas.width  = cols * CELL;
+  canvas.height = rows * CELL;
+  canvas.style.maxWidth  = '100%';
+  canvas.style.maxHeight = '100%';
+  wrap.appendChild(canvas);
+
+  state.canvas = canvas;
+  state.ctx = canvas.getContext('2d');
+  state.CELL = CELL;
+
+  // Canvas tooltip on hover
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const sy = (e.clientY - rect.top) * (canvas.height / rect.height);
+    const c = Math.floor(sx / state.CELL);
+    const r = Math.floor(sy / state.CELL);
+    if (r >= 0 && r < state.rows && c >= 0 && c < state.cols) {
+      const tt = document.getElementById('tooltip');
+      const cs = state.cellState[r * state.cols + c];
+      tt.textContent = `[${r},${c}] ${cs || 'wall'}`;
+      tt.style.left = (e.clientX + 10) + 'px';
+      tt.style.top  = (e.clientY - 24) + 'px';
+      tt.classList.add('show');
+    }
+  });
+  canvas.addEventListener('mouseleave', () => {
+    document.getElementById('tooltip').classList.remove('show');
+  });
+}
+
+function drawMaze() {
+  const { ctx, CELL, rows, cols, walls, cellState } = state;
+  if (!ctx) return;
+
+  const W = cols * CELL, H = rows * CELL;
+  ctx.fillStyle = '#080b12';
+  ctx.fillRect(0, 0, W, H);
+
+  // Draw cells
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = r * cols + c;
+      const cs = cellState[idx];
+      let fill = null;
+      if (idx === 0) fill = 'rgba(167,139,250,0.7)';
+      else if (idx === rows*cols-1) fill = 'rgba(248,113,113,0.7)';
+      else if (cs === 'current') fill = 'rgba(74,222,128,0.65)';
+      else if (cs === 'path') fill = 'rgba(251,191,36,0.5)';
+      else if (cs === 'bfs') fill = 'rgba(34,211,238,0.18)';
+      else if (cs === 'stack') fill = 'rgba(96,165,250,0.2)';
+      else if (cs === 'visited') fill = 'rgba(74,222,128,0.09)';
+
+      if (fill) {
+        ctx.fillStyle = fill;
+        ctx.fillRect(c*CELL+1, r*CELL+1, CELL-2, CELL-2);
+      }
+    }
+  }
+
+  // Draw walls
+  ctx.strokeStyle = '#2a3858';
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'square';
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = r * cols + c;
+      const w = walls[idx];
+      if (!w) continue;
+      const x = c * CELL, y = r * CELL;
+      ctx.beginPath();
+      // North
+      if (w[0]) { ctx.moveTo(x, y); ctx.lineTo(x+CELL, y); }
+      // South
+      if (w[1]) { ctx.moveTo(x, y+CELL); ctx.lineTo(x+CELL, y+CELL); }
+      // East
+      if (w[2]) { ctx.moveTo(x+CELL, y); ctx.lineTo(x+CELL, y+CELL); }
+      // West
+      if (w[3]) { ctx.moveTo(x, y); ctx.lineTo(x, y+CELL); }
+      ctx.stroke();
+    }
+  }
+
+  // Border
+  ctx.strokeStyle = 'rgba(74,222,128,0.25)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(0.75, 0.75, W-1.5, H-1.5);
+
+  // Start / End markers
+  const drawMarker = (r, c, emoji, col) => {
+    const x = c*CELL + CELL/2, y = r*CELL + CELL/2;
+    ctx.fillStyle = col;
+    ctx.font = `bold ${Math.max(10,CELL*0.45)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(emoji === 'S' ? 'S' : 'E', x, y);
+  };
+  if (CELL >= 12) {
+    drawMarker(0, 0, 'S', '#a78bfa');
+    drawMarker(rows-1, cols-1, 'E', '#f87171');
+  }
+}
+
+/* ============================================================
+   ANIMATION ENGINE
+   ============================================================ */
+function runGenStep() {
+  if (state.paused || state.phase !== 'gen') return;
+  const { genEvents, genIdx } = state;
+  if (genIdx >= genEvents.length) {
+    finalizeWalls();
+    state.phase = 'idle';
+    setStatus('done', '✅ Generation done — click Solve!');
+    updatePhaseTab('gen', genEvents.filter(e=>e.type==='remove').length + ' edges');
+    document.getElementById('btn-solve').disabled = false;
+    document.getElementById('btn-pause').disabled = true;
+    drawMaze();
+    return;
+  }
+
+  const batchSize = state.speed === 3 ? 200 : state.speed === 2 ? 40 : state.speed === 1 ? 8 : 1;
+  for (let b = 0; b < batchSize && state.genIdx < genEvents.length; b++) {
+    const ev = genEvents[state.genIdx++];
+    const { rows, cols } = state;
+
+    if (ev.type === 'start') {
+      state.cellState[0] = 'current';
+      state.visitedCount = 1;
+    }
+    else if (ev.type === 'remove') {
+      const idx1 = ev.r1*cols+ev.c1, idx2 = ev.r2*cols+ev.c2;
+      if (state.cellState[idx1] === 'current') state.cellState[idx1] = 'stack';
+      state.cellState[idx2] = 'current';
+      state.visitedCount++;
+      state.maxStack = Math.max(state.maxStack, ev.depth);
+
+      // Carve wall immediately
+      const [r1,c1,r2,c2] = [ev.r1,ev.c1,ev.r2,ev.c2];
+      if (r2 < r1) { state.walls[idx1][0]=0; state.walls[idx2][1]=0; }
+      else if (r2 > r1) { state.walls[idx1][1]=0; state.walls[idx2][0]=0; }
+      else if (c2 > c1) { state.walls[idx1][2]=0; state.walls[idx2][3]=0; }
+      else { state.walls[idx1][3]=0; state.walls[idx2][2]=0; }
+    }
+    else if (ev.type === 'backtrack') {
+      const idx = ev.r*cols+ev.c;
+      if (state.cellState[idx] !== 'current') state.cellState[idx] = 'visited';
+    }
+  }
+
+  const pct = state.genIdx / genEvents.length;
+  setProgress(pct * 60);
+  updateInfoBar();
+  drawMaze();
+
+  state.animId = setTimeout(() => {
+    if (!state.stepModeActive) runGenStep();
+  }, SPEEDS[state.speed]);
+}
+
+function runSolveStep() {
+  if (state.paused || state.phase !== 'solve') return;
+  const { solveEvents, solveIdx } = state;
+  if (solveIdx >= solveEvents.length) {
+    state.phase = 'path';
+    runPathStep();
+    return;
+  }
+
+  const batchSize = state.speed === 3 ? 300 : state.speed === 2 ? 60 : state.speed === 1 ? 12 : 1;
+  for (let b = 0; b < batchSize && state.solveIdx < solveEvents.length; b++) {
+    const ev = solveEvents[state.solveIdx++];
+    const idx = ev.r * state.cols + ev.c;
+    if (state.cellState[idx] !== 'visited' && idx !== 0 && idx !== state.rows*state.cols-1) {
+      state.cellState[idx] = 'bfs';
+    }
+  }
+
+  const pct = 0.6 + (state.solveIdx / solveEvents.length) * 0.3;
+  setProgress(pct * 100);
+  updatePhaseTab('solve', state.solveIdx + ' cells');
+  drawMaze();
+
+  state.animId = setTimeout(() => {
+    if (!state.stepModeActive) runSolveStep();
+  }, SPEEDS[state.speed]);
+}
+
+function runPathStep() {
+  if (state.phase !== 'path') return;
+  const { pathEvents } = state;
+  let i = 0;
+  for (const ev of pathEvents) {
+    const idx = ev.r * state.cols + ev.c;
+    if (idx !== 0 && idx !== state.rows*state.cols-1) {
+      state.cellState[idx] = 'path';
+    }
+    i++;
+  }
+  setProgress(100);
+  updatePhaseTab('path', pathEvents.length + ' steps');
+  state.phase = 'done';
+  setStatus('done', `🏆 Solved! Path: ${pathEvents.length} steps | BFS explored: ${state.solveEvents.length} cells`);
+  drawMaze();
+  updateStats();
+  document.getElementById('btn-pause').disabled = true;
+}
+
+/* ============================================================
+   GENERATE
+   ============================================================ */
+function generateMaze() {
+  clearAnim();
+  const rows = parseInt(document.getElementById('sl-rows').value);
+  const cols = parseInt(document.getElementById('sl-cols').value);
+  const seed = parseInt(document.getElementById('seed-inp').value) || 1;
+
+  state.rows = rows; state.cols = cols; state.seed = seed;
+  state.phase = 'gen';
+  state.paused = false;
+  state.genIdx = 0; state.solveIdx = 0; state.pathIdx = 0;
+  state.maxStack = 0; state.visitedCount = 0;
+  state.cellState = new Array(rows * cols).fill('');
+  state.stepModeActive = false;
+
+  // Init walls (all on)
+  state.walls = Array.from({length: rows*cols}, () => [1,1,1,1]);
+
+  setStatus('gen', '🔨 Generating maze with C DFS + Stack...');
+  setProgress(0);
+  document.getElementById('btn-solve').disabled = true;
+  document.getElementById('btn-pause').disabled = false;
+  resetPhaseTabs();
+
+  // Check presets first
+  const presetKey = `${rows}x${cols}x${seed}`;
+  let raw = null;
+  for (const p of PRESETS) {
+    if (p.rows===rows && p.cols===cols && p.seed===seed) { raw=p.data; break; }
+  }
+
+  if (raw) {
+    loadMazeData(raw);
+  } else {
+    // Try server, fall back to built-in generator
+    fetchFromServer(rows, cols, seed);
+  }
+}
+
+function fetchFromServer(rows, cols, seed) {
+  fetch(`/maze?rows=${rows}&cols=${cols}&seed=${seed}`)
+    .then(r => r.text())
+    .then(raw => loadMazeData(raw))
+    .catch(() => {
+      // Fallback: use JS implementation mirroring C logic
+      showToast('Running built-in JS engine (server offline)');
+      const raw = generateMazeJS(rows, cols, seed);
+      loadMazeData(raw);
+    });
+}
+
+function loadMazeData(raw) {
+  const parsed = parseMazeData(raw);
+  state.genEvents   = parsed.gen;
+  state.solveEvents = parsed.bfsList;
+  state.pathEvents  = parsed.pathList;
+  state.stats       = parsed.stats;
+  // Use walls from data for final state
+  state.wallsFinal  = parsed.walls;
+
+  // Re-init walls (all on, carved during animation)
+  state.walls = Array.from({length: state.rows*state.cols}, () => [1,1,1,1]);
+
+  initCanvas(state.rows, state.cols);
+  updateStats();
+  runGenStep();
+}
+
+function finalizeWalls() {
+  if (state.wallsFinal) state.walls = state.wallsFinal;
+}
+
+/* ============================================================
+   JS FALLBACK MAZE ENGINE (mirrors C logic exactly)
+   ============================================================ */
+function generateMazeJS(rows, cols, seed) {
+  // LCG random (matches C srand/rand pattern approximately)
+  let rng = seed;
+  function rand() { rng=(rng*1103515245+12345)&0x7fffffff; return rng; }
+
+  const N=rows*cols;
+  const walls=Array.from({length:N},()=>[1,1,1,1]);
+  const visited=new Array(N).fill(0);
+  const lines=[];
+
+  lines.push(`START 0 0`);
+  visited[0]=1;
+  const stack=[0];
+  let backtracks=0, steps=0;
+
+  const opp=[1,0,3,2];
+  const dr=[-1,1,0,0],dc=[0,0,1,-1];
+
+  while(stack.length>0){
+    const cur=stack[stack.length-1];
+    const nbrs=[];
+    for(let d=0;d<4;d++){
+      const nr=Math.floor(cur/cols)+dr[d], nc=(cur%cols)+dc[d];
+      if(nr<0||nr>=rows||nc<0||nc>=cols) continue;
+      const nxt=nr*cols+nc;
+      if(!visited[nxt]) nbrs.push([nxt,d]);
+    }
+    if(nbrs.length>0){
+      const [nxt,dir]=nbrs[rand()%nbrs.length];
+      walls[cur][dir]=0; walls[nxt][opp[dir]]=0;
+      visited[nxt]=1; stack.push(nxt); steps++;
+      const r1=Math.floor(cur/cols),c1=cur%cols;
+      const r2=Math.floor(nxt/cols),c2=nxt%cols;
+      lines.push(`REMOVE ${r1} ${c1} ${r2} ${c2} ${stack.length}`);
+    } else {
+      const p=stack.pop(); backtracks++;
+      lines.push(`BACKTRACK ${Math.floor(p/cols)} ${p%cols}`);
+    }
+  }
+  lines.push(`DONE ${backtracks} ${steps}`);
+
+  // BFS
+  const prev=new Array(N).fill(-1);
+  const dist=new Array(N).fill(0);
+  const vis2=new Array(N).fill(0);
+  const q=[0]; vis2[0]=1; let qi=0, bfsSteps=0;
+  const end=N-1;
+
+  while(qi<q.length){
+    const cur=q[qi++]; bfsSteps++;
+    const r=Math.floor(cur/cols),c=cur%cols;
+    lines.push(`BFS ${r} ${c} ${dist[cur]}`);
+    if(cur===end) break;
+    for(let d=0;d<4;d++){
+      if(walls[cur][d]) continue;
+      const nr=r+dr[d],nc=c+dc[d];
+      if(nr<0||nr>=rows||nc<0||nc>=cols) continue;
+      const nxt=nr*cols+nc;
+      if(!vis2[nxt]){vis2[nxt]=1;prev[nxt]=cur;dist[nxt]=dist[cur]+1;q.push(nxt);}
+    }
+  }
+
+  const path=[];
+  let cur=end;
+  while(cur!==-1){path.push(cur);cur=prev[cur];}
+  lines.push(`PATH_LEN ${path.length} ${bfsSteps}`);
+  for(let i=path.length-1;i>=0;i--) lines.push(`PATH ${Math.floor(path[i]/cols)} ${path[i]%cols}`);
+
+  lines.push(`WALLS ${rows} ${cols}`);
+  for(let i=0;i<N;i++) lines.push(`W ${walls[i][0]} ${walls[i][1]} ${walls[i][2]} ${walls[i][3]}`);
+  lines.push(`STATS nodes=${N} edges_in_graph=${N*4} tree_edges=${N-1} backtracks=${backtracks}`);
+
+  return lines.join('\n');
+}
+
+/* ============================================================
+   SOLVE
+   ============================================================ */
+function solveMaze() {
+  if (state.phase !== 'idle') return;
+  state.phase = 'solve';
+  state.paused = false;
+  state.solveIdx = 0;
+  document.getElementById('btn-solve').disabled = true;
+  document.getElementById('btn-pause').disabled = false;
+  setStatus('solve', '🔍 Solving with C BFS + Queue...');
+  showCode('bfs');
+  runSolveStep();
+}
+
+/* ============================================================
+   CONTROLS
+   ============================================================ */
+function togglePause() {
+  state.paused = !state.paused;
+  document.getElementById('btn-pause').textContent = state.paused ? '▶ Resume' : '⏸ Pause';
+  if (!state.paused) {
+    if (state.phase === 'gen') runGenStep();
+    else if (state.phase === 'solve') runSolveStep();
+  }
+}
+
+function stepMode() {
+  state.stepModeActive = true;
+  state.paused = false;
+  if (state.phase === 'idle' || state.phase === 'done') generateMaze();
+  if (state.phase === 'gen') { runGenStep(); state.stepModeActive = true; }
+  else if (state.phase === 'solve') { runSolveStep(); state.stepModeActive = true; }
+}
+
+function resetAll() {
+  clearAnim();
+  state.phase = 'idle';
+  state.paused = false;
+  state.genIdx = state.solveIdx = state.pathIdx = 0;
+  state.cellState = [];
+  const wrap = document.getElementById('maze-canvas-wrap');
+  wrap.innerHTML = `<div style="text-align:center;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:0.78rem">
+    <div style="font-size:2.5rem;margin-bottom:12px">🧩</div>
+    Click <strong style="color:var(--green)">Generate Maze</strong> to start<br>
+    <span style="font-size:0.65rem;margin-top:6px;display:block">Powered by C — DFS + BFS + Graph + Stack + Queue</span>
+  </div>`;
+  state.canvas = null; state.ctx = null;
+  setStatus('idle', 'Ready — pick a size and generate');
+  setProgress(0);
+  resetPhaseTabs();
+  document.getElementById('btn-solve').disabled = true;
+  document.getElementById('btn-pause').disabled = true;
+  document.getElementById('btn-pause').textContent = '⏸ Pause';
+  document.getElementById('inf-step').textContent = '—';
+  document.getElementById('inf-stack').textContent = '—';
+  document.getElementById('inf-vis').textContent = '—';
+}
+
+function clearAnim() {
+  if (state.animId) { clearTimeout(state.animId); state.animId = null; }
+}
+
+function setSpeed(s, btn) {
+  state.speed = s;
+  document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function randomSeed() {
+  document.getElementById('seed-inp').value = Math.floor(Math.random() * 90000) + 1000;
+}
+
+function applyPreset(btn) {
+  document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const r = btn.dataset.rows, c = btn.dataset.cols;
+  document.getElementById('sl-rows').value = r;
+  document.getElementById('sl-cols').value = c;
+  document.getElementById('val-rows').textContent = r;
+  document.getElementById('val-cols').textContent = c;
+}
+
+function syncSlider(which, val) {
+  document.getElementById('val-'+which).textContent = val;
+  document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+}
+
+/* ============================================================
+   UI HELPERS
+   ============================================================ */
+function setStatus(type, msg) {
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-text');
+  dot.className = 'status-dot';
+  if (type === 'gen') dot.classList.add('gen');
+  else if (type === 'solve') dot.classList.add('solve');
+  else if (type === 'done') dot.classList.add('done');
+  txt.textContent = msg;
+}
+
+function setProgress(pct) {
+  document.getElementById('prog').style.width = pct + '%';
+}
+
+function updateInfoBar() {
+  document.getElementById('inf-step').textContent = state.genIdx;
+  const cur = state.genEvents[state.genIdx-1];
+  document.getElementById('inf-stack').textContent = cur?.depth ?? '—';
+  document.getElementById('inf-vis').textContent = state.visitedCount;
+}
+
+function resetPhaseTabs() {
+  ['gen','solve','path'].forEach(id => {
+    const t = document.getElementById('ptab-'+id);
+    t.className = 'phase-tab';
+    document.getElementById('pval-'+id).textContent = '—';
+  });
+}
+
+function updatePhaseTab(id, val) {
+  const t = document.getElementById('ptab-'+id);
+  t.className = `phase-tab active ${id}`;
+  document.getElementById('pval-'+id).textContent = val;
+}
+
+function updateStats() {
+  const s = state.stats;
+  const N = state.rows * state.cols;
+  document.getElementById('stat-nodes').textContent = s.nodes ?? N;
+  document.getElementById('stat-edges').textContent = s.edges_in_graph ?? (N*4);
+  document.getElementById('stat-tree').textContent = s.tree_edges ?? (N-1);
+  document.getElementById('stat-back').textContent = s.backtracks ?? '—';
+  document.getElementById('stat-bfs').textContent = s.bfsSteps ?? '—';
+  document.getElementById('stat-path').textContent = s.pathLen ?? '—';
+
+  // Performance bars
+  const visitPct = N > 0 ? Math.round((state.visitedCount || N) / N * 100) : 0;
+  const stkPct = N > 0 ? Math.round(state.maxStack / N * 100) : 0;
+  const pathEff = s.pathLen && N ? Math.round(s.pathLen / N * 100) : 0;
+  const bfsCov = s.bfsSteps && N ? Math.round(s.bfsSteps / N * 100) : 0;
+
+  setBar('vis', visitPct, visitPct+'%');
+  setBar('stk', stkPct, state.maxStack||'—');
+  setBar('pth', Math.min(pathEff,100), pathEff+'%');
+  setBar('bfs', Math.min(bfsCov,100), bfsCov+'%');
+}
+
+function setBar(id, pct, label) {
+  document.getElementById('pb-'+id).style.width = Math.min(pct,100)+'%';
+  document.getElementById('pbv-'+id).textContent = label;
+}
+
+function showCode(which, tabEl) {
+  document.getElementById('code-display').innerHTML = CODE[which] || CODE.graph;
+  if (tabEl) {
+    document.querySelectorAll('.code-tab').forEach(t => t.classList.remove('active'));
+    tabEl.classList.add('active');
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+window.addEventListener('DOMContentLoaded', () => {
+  showCode('graph', document.querySelector('.code-tab'));
+  document.getElementById('btn-pause').disabled = true;
+  document.getElementById('btn-solve').disabled = true;
+
+  // Auto-generate on load after short delay
+  setTimeout(() => generateMaze(), 400);
+});
+</script>
+</body>
+</html>
